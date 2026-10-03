@@ -65,3 +65,75 @@ test('a hidden network does no work, and a new fade replaces one in progress', a
   assert.equal(network.amount, 0);
   slow.catch(() => {});
 });
+
+// ---- the cursor pushes cubes away ----------------------------------------------------
+function screenOf(camera, cube) {
+  camera.updateMatrixWorld(true);
+  return new THREE.Vector3().setFromMatrixPosition(cube.matrixWorld).project(camera);
+}
+const cubesOf = (network) => network.group.children.filter((c) => c.geometry.type === 'EdgesGeometry');
+
+function pushedRun(frames, pointerFor) {
+  const a = makeNetwork();
+  const b = makeNetwork(); // the same network with no cursor, as a control
+  const cubesA = cubesOf(a.network);
+  const cubesB = cubesOf(b.network);
+  a.network.update(0, null);
+  b.network.update(0, null);
+  const start = screenOf(a.camera, cubesA[0]);
+  for (let f = 0; f < frames; f++) {
+    a.network.update(1 / 60, pointerFor(start, f));
+    b.network.update(1 / 60, null);
+  }
+  const offset = (i) => {
+    const pa = screenOf(a.camera, cubesA[i]);
+    const pb = screenOf(b.camera, cubesB[i]);
+    return { dx: pa.x - pb.x, dy: pa.y - pb.y, length: Math.hypot(pa.x - pb.x, pa.y - pb.y) };
+  };
+  return { offset, start, a, b, cubesA };
+}
+
+test('a cursor beside a cube pushes it away, on the screen', () => {
+  const { offset } = pushedRun(40, (start) => ({ x: start.x - 0.08, y: start.y }));
+  const o = offset(0);
+  assert.ok(o.dx > 0.05, `pushed to the right, away from a cursor on its left (dx = ${o.dx.toFixed(3)})`);
+  assert.ok(Math.abs(o.dy) < Math.abs(o.dx), 'mostly along the line away from the cursor');
+});
+
+test('cubes far from the cursor stay put', () => {
+  const { offset, cubesA, a } = pushedRun(40, (start) => ({ x: start.x - 0.08, y: start.y }));
+  const far = cubesA
+    .map((cube, i) => ({ i, d: Math.hypot(screenOf(a.camera, cube).x - screenOf(a.camera, cubesA[0]).x, screenOf(a.camera, cube).y - screenOf(a.camera, cubesA[0]).y) }))
+    .filter((p) => p.d > 1.2);
+  assert.ok(far.length > 5);
+  for (const { i } of far) assert.ok(offset(i).length < 1e-6, `cube ${i} was not touched`);
+});
+
+test('pushed cubes spring back when the cursor leaves, and the push is capped', () => {
+  // the cursor sits on the cube for a while, then leaves
+  const { offset } = pushedRun(400, (start, f) => (f < 120 ? { x: start.x - 0.03, y: start.y } : null));
+  assert.ok(offset(0).length < 0.02, `settled back (still ${offset(0).length.toFixed(3)} view units away)`);
+  const held = pushedRun(300, (start) => ({ x: start.x - 0.03, y: start.y }));
+  assert.ok(held.offset(0).length < 1, 'the push stops at a limit');
+});
+
+test('a cube that has been pushed also tumbles, and stops tumbling after', () => {
+  const { a, b, cubesA } = pushedRun(40, (start) => ({ x: start.x - 0.08, y: start.y }));
+  const cubesB = cubesOf(b.network);
+  const turned = Math.abs(cubesA[0].rotation.x - cubesB[0].rotation.x) + Math.abs(cubesA[0].rotation.y - cubesB[0].rotation.y) + Math.abs(cubesA[0].rotation.z - cubesB[0].rotation.z);
+  assert.ok(turned > 0.01, `turned by ${turned.toFixed(3)} rad`);
+  for (let f = 0; f < 600; f++) {
+    a.network.update(1 / 60, null);
+    b.network.update(1 / 60, null);
+  }
+  const later = Math.abs(cubesA[0].rotation.x - cubesB[0].rotation.x) + Math.abs(cubesA[0].rotation.y - cubesB[0].rotation.y) + Math.abs(cubesA[0].rotation.z - cubesB[0].rotation.z);
+  assert.ok(later < 0.02, `settled (${later.toFixed(4)} rad left)`);
+});
+
+test('the network no longer writes depth or tests it, so the floor cannot hide parts of it', () => {
+  const { network } = makeNetwork();
+  const material = network.group.children[0].material;
+  assert.equal(material.depthTest, false);
+  assert.equal(material.depthWrite, false);
+  assert.ok(network.group.children.every((c) => c.renderOrder < 0));
+});

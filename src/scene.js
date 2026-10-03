@@ -33,7 +33,7 @@ export function createScene(container) {
   scene.add(sun);
 
   // The floor is invisible apart from the shadows that fall on it.
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.22 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.22, depthWrite: false }));
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
@@ -137,6 +137,10 @@ export function createScene(container) {
     setArena(size) { arena = size; fit(); },
     get spawnY() { return spawnY; },
     setClearColour: (hex) => renderer.setClearColor(hex),
+    // The cursor in view coordinates (-1..1 across and up), or null if it is off the stage.
+    pointerNdc() {
+      return pointerOver ? { x: pointer.x, y: pointer.y } : null;
+    },
     floorPoint() {
       if (!pointerOver) return null;
       raycaster.setFromCamera(pointer, camera);

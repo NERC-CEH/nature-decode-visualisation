@@ -78,6 +78,15 @@ export const NETWORK = {
   cycle: 30,
   turn: 0.25,
   seed: 7,
+  // The cursor pushes cubes away. Radius is in view heights (a radius of 0.35 is a third of the
+  // way up the screen); push is an acceleration in units/s^2, and spring and damping bring a
+  // pushed cube back. Spin tumbles it. maxPush is the furthest a cube can be pushed, in units.
+  repelRadius: 0.35,
+  repelPush: 200,
+  repelSpin: 90,
+  spring: 5,
+  damping: 3.5,
+  maxPush: 14,
 };
 
 // Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.

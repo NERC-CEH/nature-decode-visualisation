@@ -287,6 +287,8 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 - The network hangs in the camera's own space, so it fills the screen behind the title at any window shape and does not move with the floor camera.
 - Everything moves slowly: each cube sways by about 3.5% of the view on its own cycle of 30 s or so and turns slowly on its axes, and the whole cloud rocks gently back and forth, which gives it depth. The speed is a few pixels per second.
 - Layout, sizes and cycles are seeded, so the network looks the same each time the page loads.
+- **Cursor:** cubes near the cursor are pushed away from it across the screen and tumble, as the floor cubes are on later steps. Nearness is measured on the screen (within a third of the screen height), and the push is an acceleration with the same squared falloff as the floor cubes. Pushed cubes spring back (spring 5, damping 3.5) and stop tumbling after about 2 s, and a push is capped at 14 units. The lines stay joined to the cubes, so they stretch as cubes are pushed.
+- **Drawing order:** the network is drawn first and ignores the depth buffer. It hangs in front of the camera, and the invisible floor (which writes depth) used to hide the parts of it that lay behind the floor as seen from the camera, cutting lines off. The floor's shadow material no longer writes depth either.
 - On Next the network fades out over the same 1 s, and with the same easing, as the page eases to white. On Back to the intro it fades back in. It is not shown on the finale. It does no work while hidden.
 - Reduced motion (M7): the network stays but stops moving.
 

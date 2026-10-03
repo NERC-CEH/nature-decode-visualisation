@@ -79,7 +79,7 @@ ui.render(controller.state);
 // Everything that changes from one frame to the next.
 function update(dt) {
   field?.tick(dt);
-  network?.update(dt);
+  network?.update(dt, scene?.pointerNdc());
   const point = ctx.repel && scene?.floorPoint();
   if (point) repel(physics.bodies, point, dt);
   physics.step(dt);
