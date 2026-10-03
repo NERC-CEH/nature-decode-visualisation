@@ -40,8 +40,8 @@ export const PHYSICS = {
 // Durations in seconds (technical-spec 6.2). Starting values, tuned by eye.
 export const DURATIONS = {
   theme: 1.0,
-  drop: 1.0, // cubes are released, one after another, over this time...
-  dropRamp: 0.5, // ...ramping up over the first and down over the last this many seconds
+  drop: 2.0, // cubes are released, one after another, over this time...
+  dropRamp: 1.0, // ...ramping up over the first and down over the last this many seconds
   dropSettle: 0.5, // extra wait after the last cube spawns before the step is ready
   lift: 1.2, // cubes rise out of view on Back
 };

@@ -195,7 +195,7 @@ Generator tasks (M0):
 
 | Transition | Forward | Back |
 |---|---|---|
-| Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 1 s. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
+| Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 2 s, ramping up for the first second and down for the last. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
 | Data → Categorise | Random-order recolour, 2 s total, each cube 0.3 s | Recolour to black, 1 s |
 | Categorise → Sort | Cubes slide to their heap spots and tumble in, 3 s | Ease to the Categorise snapshot, 1.2 s |
 | Sort → Arrange | Each heap rises in turn and spreads into its sheet, 3.5 s | Ease to the Sort snapshot, 1.5 s |
@@ -215,7 +215,7 @@ Generator tasks (M0):
 | # | Step | Forward | Interaction |
 |---|---|---|---|
 | 0 | Intro | Title and line fade in on black, over a slowly drifting network of small wireframe cubes joined by thin lines (7.8). | Next. |
-| 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 1 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
+| 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 2 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
 | 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. | Cursor repels cubes. |
 | 3 | **Sort** | Cubes are steered to one spot per species, in a row across the floor in display order, and tumble into heaps there. No labels. | Cursor repels cubes. |
 | 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box and axis titles fade in. | Drag to rotate. Spring back. |
@@ -405,7 +405,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 ### M1 as built
 
 - The floor is sized from the cube count at 6 square units per cube, 1.5 : 1 wide (about 37 × 25 units for 164 cubes), so the cubes read as small. The camera is fitted to it at any window shape, and cubes are released from just above the top of the view. The view is then lowered so the floor sits one third of the way up the screen.
-- Cubes pour into the middle of the floor as a stream over 1 s. They are released down several side-by-side lanes (a sunflower spiral, 1.25 units apart) at 28 units/s, so no cube starts inside another: cubes in one lane are at least 1.8 apart at release, and the number of lanes follows the cube count (11 lanes for 164 cubes). Release order, spin and sideways drift are seeded, so a given data file always drops the same way. If a frame is slow, cubes released during it start part-way down their fall, so the stream stays smooth. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
+- Cubes pour into the middle of the floor as a stream. They are released down several side-by-side lanes (a sunflower spiral, 1.25 units apart) at 28 units/s, so no cube starts inside another: cubes in one lane are at least 1.8 apart at release, and the number of lanes follows the cube count (11 lanes for 164 cubes). Release order, spin and sideways drift are seeded, so a given data file always drops the same way. If a frame is slow, cubes released during it start part-way down their fall, so the stream stays smooth. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
 - Each cube has a thin darker edge drawn in its own shader (a darker version of its own colour), and the floor shows only the soft shadows. Cubes start near-black (`#111111`), not pure black, so the lighting still shows their shape.
 - Repulsion was tuned in a simulation (a resting cube next to a stationary cursor is driven out to the edge of the cursor's reach, about 6 units; a quick sweep nudges it 1 to 5 units). Final values are set by eye at review.
 - `?debug` on the page address exposes the app as `__dataCube` in the browser console, for testing.
@@ -417,7 +417,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - Shadows fade in as the cubes fall: none at the release height, full strength within 3.5 units of the floor. The shadow map cannot be transparent, so each cube's shadow is dithered (a fraction of its pixels are dropped, by height) and the map's soft filtering turns that into a lighter shadow.
 - `?debug` also gives `pause()` and `advance(seconds)`, which stop the animation loop and step it by hand, so a frame can be captured at an exact time.
 
-- The release rate ramps up over the first 0.5 s and down over the last 0.5 s (`DURATIONS.dropRamp`), so the stream starts and tails off like a pour. With the 1 s release the two ramps meet, so the flow is a triangle that peaks at 0.5 s at about twice the average rate (about 280 cubes a second for 164 cubes). The default cube releases 1, 7, 20, 40 and 82 cubes by 0.05, 0.15, 0.25, 0.35 and 0.5 s, and 163 by 0.95 s. Lengthening `DURATIONS.drop` leaves a steady flow between the ramps. The lanes are sized for the peak rate, so the stream is wider than without a ramp (22 lanes, about 6 units from the middle, for 164 cubes).
+- The release rate ramps up over the first second and down over the last (`DURATIONS.dropRamp`, 1 s), so the stream starts and tails off like a pour. The release lasts 2 s (`DURATIONS.drop`), so the two ramps meet and the flow is a triangle that peaks at 1 s at about 164 cubes a second. The default cube has released 1, 7, 20, 46 and 82 cubes by 0.1, 0.3, 0.5, 0.75 and 1 s, and 159 by 1.75 s. A drop longer than twice the ramp leaves a steady flow between the ramps; a ramp longer than half the drop is cut to half. (An earlier version dropped the cubes in 1 s with 0.5 s ramps, which made the stream wider because the lanes are sized for the peak rate.) The lanes are sized for the peak rate, so no cube starts inside another.
 
 ### M0 as built
 
