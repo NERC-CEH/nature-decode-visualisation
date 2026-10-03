@@ -166,9 +166,10 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       mesh.instanceColor.needsUpdate = true;
     },
 
-    // Every cube changes to the colour `targetOf(i)` returns, each at its own random moment, so the
-    // change sweeps over the cubes in no order. All are done within `total` seconds and each
-    // takes `each` seconds over its own change. The order is the same every time.
+    // Every cube changes to the colour `targetOf(i)` returns, each at its own random moment and
+    // all at once (there is no fade), so the change sweeps over the cubes in no order. All are
+    // done within `total` seconds. The order is the same every time. `each` is how long a cube's
+    // push lasts (see below): the colour changes in the middle of it.
     // With \`popPower\` above zero each cube also gets a brief push while it changes (see POP).
     recolour(targetOf, total = DURATIONS.categorise, each = DURATIONS.categoriseEach, popPower = 0) {
       recolouring?.cancel();
@@ -194,7 +195,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
           last = time;
           for (let i = 0; i < count; i++) {
             const local = each > 0 ? Math.min(1, Math.max(0, (time - start[i]) / each)) : 1;
-            mesh.setColorAt(i, colour.copy(from[i]).lerp(to[i], ease.inOutQuad(local)));
+            mesh.setColorAt(i, local >= 0.5 ? to[i] : from[i]);
             // a push that rises and falls over the moment of the change
             if (popPower > 0 && local > 0 && local < 1 && state[i].body) {
               pop(state[i].body, angle[i], popPower * Math.sin(Math.PI * local), frame);

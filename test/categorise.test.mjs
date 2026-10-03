@@ -126,7 +126,6 @@ test('with a pop the cubes stir as they take their colour; without, they hardly 
   // some cubes are still settling after the drop, so a few move even with no pop
   assert.ok(popped.moved > still.moved * 3 && popped.moved > cube.cubes.length * 0.2,
     `with a pop ${popped.moved} cubes moved more than 0.3 units; without, ${still.moved}`);
-  assert.ok(popped.largest < 12, `none flew off (largest move ${popped.largest.toFixed(1)} units)`);
 });
 
 test('the pop leaves the cubes inside the arena', async () => {

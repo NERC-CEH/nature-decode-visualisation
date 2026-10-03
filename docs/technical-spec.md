@@ -425,14 +425,16 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 
 ### M2 as built
 
-- Each cube takes its species colour (from the palette in `config.js`, by species id) at its own random moment: every cube's start time is drawn at random (seeded, so the order is the same every time) and the whole sweep finishes within 2 s, each cube taking 0.3 s over its own change with an ease in and out. Cubes stay where they are and keep tumbling if still moving, and the cursor still pushes them.
-- Back drains the colours to near-black within 1 s, the same way, and only that: the cubes stay where they are.
+- Each cube takes its species colour (from the palette in `config.js`, by species id) at its own random moment: every cube's start time is drawn at random (seeded, so the order is the same every time) and the whole sweep finishes within 2 s, each cube changing colour instantly (there is no fade; see the later note on the push). Cubes keep tumbling if still moving, and the cursor still pushes them.
+- Back drains the colours to near-black within 1 s, the same way (each cube switching instantly at its own random moment), and only that: the cubes stay where they are.
 - The colour of every cube is part of the snapshot taken on leaving the step, as the spec requires.
 - The species colours are clearly distinct on white. The palest (pale green and sky) are the weakest against the page; the shading keeps their shape readable. This still needs checking on a projector.
 - `?debug` also exposes `speciesColour`, so a slow-motion version of the step can be run for screenshots.
 
 - The thin dark edges are removed (they looked wrong as each cube gained its colour). Cubes are plain shaded boxes.
 - **Popcorn:** as each cube takes its colour it gets a brief push, the cursor's own push (`REPEL`) in a random direction (one per cube, seeded), rising and falling over the 0.3 s of its change. At 20% of the cursor's power it did nothing: a cube at rest needs about 10% before it moves at all, and friction swallows the rest. A simulation of a resting cube pushed for 0.3 s found 50% slides it about 1 unit with a 0.2 unit hop, 55% slides it about 2.2 units (a fifth of the 11.5 units that the cursor at full strength gives over the same time), and 70% about 6 units. `POP.power` is set to 0.55. In the browser, 70 of 164 cubes moved more than 0.3 units during the step (42 more than 1 unit, the most 3.2 units), against 6 (none more than 1 unit) with the push turned off. There is no push on Back.
+
+- **No fade, and three times the pop (changed again at review):** the colour now changes instantly, at the middle of the cube's 0.3 s push, and `POP.power` is 1.65 (three times 0.55). Friction makes the effect grow much faster than the power: a lone resting cube pushed at 55% slides about 2 units, at 110% about 20 and at 165% about 43 (the length of the floor). In a pile the cubes knock into each other and the walls stop them. In the browser, 141 of 164 cubes moved more than 0.3 units during the step (112 more than 1 unit, the furthest 27 units, the highest about 6 units up), against 6 with the push turned off, so the heap bursts across the floor. The step's own counts from the earlier 55% setting (70 cubes moved) no longer apply.
 
 ### M0 as built
 
