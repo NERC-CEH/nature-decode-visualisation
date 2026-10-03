@@ -44,6 +44,9 @@ export const DURATIONS = {
   dropRamp: 1.0, // ...ramping up over the first and down over the last this many seconds
   dropSettle: 0.5, // extra wait after the last cube spawns before the step is ready
   lift: 1.2, // cubes rise out of view on Back
+  categorise: 2.0, // every cube has taken its species colour within this time...
+  categoriseEach: 0.3, // ...taking this long over the change itself
+  categoriseBack: 1.0, // and on Back, the colours drain away within this time
 };
 
 // The floor the cubes fall onto. Sized from the cube count; one world unit is one cube edge.

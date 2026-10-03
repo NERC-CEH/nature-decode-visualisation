@@ -4,7 +4,7 @@ An interactive 3D animation that shows how scattered records of wildlife become 
 (species × location × time) that reveals patterns in nature. It rebuilds the
 [physical data cube](https://digitalenvironment.org/building-a-physical-data-cube/) as a web page.
 
-Status: **M1** (Data step). The page shell, step controller, data tooling and the falling-cubes step work. The other 3D
+Status: **M2** (Categorise). The page shell, step controller, data tooling and the Data and Categorise steps work. The other 3D
 steps are being built one milestone at a time. See [docs/technical-spec.md](docs/technical-spec.md).
 
 ## Run it

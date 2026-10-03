@@ -395,7 +395,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 |---|---|---|
 | M0 (built) | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
 | M1 (built) | **Data**: drop, floor, walls, shadows, edge shader, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
-| M2 | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
+| M2 (built) | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
 | M5 | **Insights** ×3: turns, orthographic hand-over, face blending, key | Each face shows its claim at a glance. |
@@ -422,6 +422,14 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - The release rate ramps up over the first second and down over the last (`DURATIONS.dropRamp`, 1 s), so the stream starts and tails off like a pour. The release lasts 2 s (`DURATIONS.drop`), so the two ramps meet and the flow is a triangle that peaks at 1 s at about 164 cubes a second. The default cube has released 1, 7, 20, 46 and 82 cubes by 0.1, 0.3, 0.5, 0.75 and 1 s, and 159 by 1.75 s. A drop longer than twice the ramp leaves a steady flow between the ramps; a ramp longer than half the drop is cut to half. (An earlier version dropped the cubes in 1 s with 0.5 s ramps, which made the stream wider because the lanes are sized for the peak rate.) The lanes are sized for the peak rate, so no cube starts inside another.
 
 - The pour varies at random (`STREAM.variation`, 0.5): the release rate and the width of the stream each wander by up to 50% either way, on slow cycles of roughly half a second to two seconds, on top of the ramps. The width is the number of lanes in use, taken from the inside of the spiral outward, so the stream's area really does change by up to 50%. The release time of each cube is read from the tabulated, randomised flow. When the stream is narrow and the flow is high, a cube waits for a free lane (so no cube is ever released inside another), which flattens the peaks a little and makes the pour end up to about 0.6 s after its planned time. Up to 50% more lanes than the plain pour need are available, so the widest the stream gets is about 5 units from the middle for 164 cubes. Everything is seeded, so a given data file always pours the same way. For the default cube, cubes released in successive 0.2 s windows run 4, 11, 12, 19, 41, 23, 21, 21, 9, 3, using 4 to 14 lanes.
+
+### M2 as built
+
+- Each cube takes its species colour (from the palette in `config.js`, by species id) at its own random moment: every cube's start time is drawn at random (seeded, so the order is the same every time) and the whole sweep finishes within 2 s, each cube taking 0.3 s over its own change with an ease in and out. Cubes stay where they are and keep tumbling if still moving, and the cursor still pushes them.
+- Back drains the colours to near-black within 1 s, the same way, and only that: the cubes stay where they are.
+- The colour of every cube is part of the snapshot taken on leaving the step, as the spec requires.
+- The species colours are clearly distinct on white. The palest (pale green and sky) are the weakest against the page; the thin darker edge keeps their outlines readable. This still needs checking on a projector.
+- `?debug` also exposes `speciesColour`, so a slow-motion version of the step can be run for screenshots.
 
 ### M0 as built
 

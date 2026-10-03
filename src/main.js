@@ -1,6 +1,6 @@
 // Boot: load the data, build the scene and controller, wire up the UI.
 
-import { STEPS, DURATIONS } from './config.js';
+import { STEPS, DURATIONS, speciesColour } from './config.js';
 import { readGlobalCube } from './data.js';
 import { arenaSize, streamRadius } from './arena.js';
 import { createTheme } from './theme.js';
@@ -94,6 +94,7 @@ if (location.search.includes('debug')) {
     ctx,
     controller,
     arena,
+    speciesColour,
     pause: () => { paused = true; },
     advance: (seconds) => {
       for (let t = 0; t < seconds - 1e-9; t += 1 / 60) update(1 / 60);

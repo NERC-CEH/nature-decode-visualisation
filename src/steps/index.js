@@ -5,11 +5,13 @@
 
 import { wait } from '../tween.js';
 import { dataStep } from './data.js';
+import { categoriseStep } from './categorise.js';
 
 const PLACEHOLDER_PAUSE = 0.4; // seconds
 
 const built = {
   data: dataStep,
+  categorise: categoriseStep,
 };
 
 export function buildSteps(configSteps) {

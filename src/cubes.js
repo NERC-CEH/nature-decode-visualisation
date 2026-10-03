@@ -8,11 +8,12 @@
 import * as THREE from 'three';
 import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
-import { DURATIONS, PHYSICS } from './config.js';
+import { ARENA, DURATIONS, PHYSICS } from './config.js';
+import { mulberry32 } from './random.js';
 
 const EDGE_WIDTH = 0.045; // fraction of a cube face, on each side
 const EDGE_DARKEN = 0.55;
-const START_COLOUR = '#111111'; // near-black, so lighting still shows the cube's shape
+export const START_COLOUR = '#111111'; // near-black, so lighting still shows the cube's shape
 const LIFT_HEIGHT = 40; // how far cubes rise when they leave
 
 function edgeMaterial() {
@@ -82,6 +83,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   let clock = 0;
   let pending = []; // cubes waiting to drop, with their plan entries
   let onDropped = null;
+  let recolouring = null;
 
   function hide(i) {
     dummy.position.set(0, -100, 0);
@@ -181,6 +183,36 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     setColour(i, hex) {
       setColour(i, hex);
       mesh.instanceColor.needsUpdate = true;
+    },
+
+    // Every cube changes to the colour `targetOf(i)` returns, each at its own random moment, so the
+    // change sweeps over the cubes in no order. All are done within `total` seconds and each
+    // takes `each` seconds over its own change. The order is the same every time.
+    recolour(targetOf, total = DURATIONS.categorise, each = DURATIONS.categoriseEach) {
+      recolouring?.cancel();
+      const random = mulberry32(ARENA.spawnSeed + 11);
+      const from = [];
+      const to = [];
+      const start = [];
+      for (let i = 0; i < count; i++) {
+        mesh.getColorAt(i, colour);
+        from.push(colour.clone());
+        to.push(new THREE.Color(targetOf(i)));
+        start.push(random() * Math.max(0, total - each));
+      }
+      recolouring = tween({
+        duration: total,
+        easing: ease.linear,
+        onUpdate: (progress) => {
+          const time = progress * total;
+          for (let i = 0; i < count; i++) {
+            const local = each > 0 ? Math.min(1, Math.max(0, (time - start[i]) / each)) : 1;
+            mesh.setColorAt(i, colour.copy(from[i]).lerp(to[i], ease.inOutQuad(local)));
+          }
+          mesh.instanceColor.needsUpdate = true;
+        },
+      });
+      return recolouring.finished.then(() => undefined);
     },
 
     // The pose and colour of every cube, so a step can be returned to later.
