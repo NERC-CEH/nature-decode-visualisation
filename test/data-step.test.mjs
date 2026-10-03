@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { arenaSize, spawnPlan, streamRadius } from '../src/arena.js';
+import { arenaSize, rampTime, spawnPlan, streamRadius } from '../src/arena.js';
 import { createPhysics } from '../src/physics.js';
 import { repel } from '../src/repulsion.js';
 import { createCubeField } from '../src/cubes.js';
@@ -18,17 +18,40 @@ test('the arena grows with the cube count and keeps its shape', () => {
   assert.ok(Math.abs(large.width * large.depth / 400 - 6) < 1e-6, 'six square units per cube');
 });
 
-test('the spawn plan is repeatable and releases one cube per time slot', () => {
+test('the spawn plan is repeatable, and with no ramp releases cubes evenly', () => {
   const a = spawnPlan(164, { duration: 1 });
   assert.deepEqual(a, spawnPlan(164, { duration: 1 }));
   assert.notDeepEqual(a, spawnPlan(164, { duration: 1, seed: 2 }));
   const delays = a.map((c) => c.delay).sort((x, y) => x - y);
-  delays.forEach((d, k) => assert.ok(Math.abs(d - (k * 1) / 164) < 1e-9));
+  delays.forEach((d, k) => assert.ok(Math.abs(d - (k + 0.5) / 164) < 1e-9));
   for (const c of a) {
     const q = c.quaternion;
     assert.ok(Math.abs(Math.hypot(q.x, q.y, q.z, q.w) - 1) < 1e-9, 'unit quaternion');
     assert.equal(c.velocity.y, -STREAM.speed);
   }
+});
+
+test('the release rate ramps up at the start and down at the end', () => {
+  const plan = spawnPlan(164, { duration: 1, ramp: 0.5 });
+  const released = (from, to) => plan.filter((c) => c.delay >= from && c.delay < to).length;
+  assert.ok(plan.every((c) => c.delay >= 0 && c.delay <= 1));
+  const start = released(0, 0.1);
+  const middle = released(0.45, 0.55);
+  const end = released(0.9, 1);
+  assert.ok(middle > 6 * start, `starts slowly (${start} cubes in the first 0.1 s, ${middle} in the middle 0.1 s)`);
+  assert.ok(middle > 6 * end, `and tails off (${end} in the last 0.1 s)`);
+  assert.ok(Math.abs(released(0, 0.5) - released(0.5, 1.01)) <= 2, 'the ramp up and down match');
+});
+
+test('a short ramp leaves a steady flow in between', () => {
+  // 2 s release with 0.5 s ramps: 0.5 s up, 1 s steady, 0.5 s down
+  const plan = spawnPlan(300, { duration: 2, ramp: 0.5 });
+  const released = (from, to) => plan.filter((c) => c.delay >= from && c.delay < to).length;
+  assert.ok(Math.abs(released(0.6, 0.9) - released(1.0, 1.3)) <= 3, 'equal counts in equal steady spans');
+  assert.ok(released(0, 0.1) < released(0.6, 0.7) / 4);
+  assert.ok(Math.abs(rampTime(0.5, 2, 0.5) - 1) < 1e-9, 'half the cubes are out at the midpoint');
+  assert.equal(rampTime(0, 2, 0.5), 0);
+  assert.ok(Math.abs(rampTime(1, 2, 0.5) - 2) < 1e-9);
 });
 
 test('the stream is a narrow column into the middle of the floor', () => {
@@ -41,8 +64,8 @@ test('the stream is a narrow column into the middle of the floor', () => {
 });
 
 test('no cube is released inside another: lanes are apart and cubes in a lane are spaced out', () => {
-  for (const count of [30, 164, 405]) {
-    const plan = spawnPlan(count, { duration: 1 });
+  for (const [count, ramp] of [[30, 0], [164, 0], [405, 0], [164, 0.5], [405, 0.5]]) {
+    const plan = spawnPlan(count, { duration: 1, ramp });
     const lanes = new Map();
     for (const c of plan) {
       const key = c.x + ',' + c.z;
@@ -56,7 +79,8 @@ test('no cube is released inside another: lanes are apart and cubes in a lane ar
       }
       const times = list[i].times.sort((x, y) => x - y);
       for (let k = 1; k < times.length; k++) {
-        assert.ok((times[k] - times[k - 1]) * STREAM.speed >= STREAM.gap - 1e-9, 'gap along the lane at release');
+        assert.ok((times[k] - times[k - 1]) * STREAM.speed >= STREAM.gap - 1e-6,
+          `gap along the lane at release (${count} cubes, ramp ${ramp})`);
       }
     }
   }
@@ -184,7 +208,7 @@ test('a cube released late on a slow frame starts further down its fall, not at 
 test('cubes are released above the frame', async () => {
   const { field, physics } = makeField(10);
   const done = field.drop(0.5, 0);
-  field.tick(1 / 600); // the first cube is due at time zero
+  for (let f = 0; f < 60 && physics.bodies.length === 0; f++) field.tick(1 / 600); // wait for the first cube
   assert.ok(physics.bodies.length >= 1);
   assert.ok(physics.bodies[0].position.y > 19.9 && physics.bodies[0].position.y <= 20);
   field.tick(1);
@@ -248,9 +272,11 @@ test('dropping again starts from scratch', async () => {
 
 test('the stream radius matches the outermost lane of the plan', () => {
   for (const count of [30, 164, 405]) {
-    const plan = spawnPlan(count, { duration: 1 });
-    const widest = Math.max(...plan.map((c) => Math.hypot(c.x, c.z)));
-    assert.ok(Math.abs(streamRadius(count, { duration: 1 }) - widest) < 1e-9);
+    for (const ramp of [0, 0.5]) {
+      const plan = spawnPlan(count, { duration: 1, ramp });
+      const widest = Math.max(...plan.map((c) => Math.hypot(c.x, c.z)));
+      assert.ok(Math.abs(streamRadius(count, { duration: 1, ramp }) - widest) < 1e-9);
+    }
   }
   assert.ok(streamRadius(164, { duration: 1 }) < 6, 'a narrow stream');
 });

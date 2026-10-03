@@ -417,6 +417,8 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - Shadows fade in as the cubes fall: none at the release height, full strength within 3.5 units of the floor. The shadow map cannot be transparent, so each cube's shadow is dithered (a fraction of its pixels are dropped, by height) and the map's soft filtering turns that into a lighter shadow.
 - `?debug` also gives `pause()` and `advance(seconds)`, which stop the animation loop and step it by hand, so a frame can be captured at an exact time.
 
+- The release rate ramps up over the first 0.5 s and down over the last 0.5 s (`DURATIONS.dropRamp`), so the stream starts and tails off like a pour. With the 1 s release the two ramps meet, so the flow is a triangle that peaks at 0.5 s at about twice the average rate (about 280 cubes a second for 164 cubes). The default cube releases 1, 7, 20, 40 and 82 cubes by 0.05, 0.15, 0.25, 0.35 and 0.5 s, and 163 by 0.95 s. Lengthening `DURATIONS.drop` leaves a steady flow between the ramps. The lanes are sized for the peak rate, so the stream is wider than without a ramp (22 lanes, about 6 units from the middle, for 164 cubes).
+
 ### M0 as built
 
 - Generator defaults were tuned from the original script's values: detection over time 0.15 to 1.0 (was 0.2 to 0.9), habitat cut-off 0.3 (was 0.5), species rarity 0.6 to 1 (was 0.5 to 1). With these about 58% of random iterations pass the story checks (about 12% with the original values), and `--seed auto` finds a passing seed within a few tries. The committed cube is seed 1: 164 records.

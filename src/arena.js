@@ -29,22 +29,41 @@ export function streamLanes(count, spacing = STREAM.spacing) {
   });
 }
 
+// The release rate ramps up over the first `ramp` seconds, holds steady, and ramps down over the
+// last `ramp` seconds, so the stream starts and tails off like a pour. `rampTime(q, ...)` returns
+// the time by which a share `q` (0..1) of the cubes has been released. With no ramp the cubes
+// are released evenly.
+export function rampTime(q, duration, ramp = 0) {
+  const r = Math.min(Math.max(ramp, 0), duration / 2);
+  const area = duration - r; // total of the rate profile: it rises 0..1, holds at 1, falls 1..0
+  const y = q * area;
+  if (y <= r / 2 && r > 0) return Math.sqrt(2 * r * y); // rising
+  if (y <= r / 2 + (duration - 2 * r)) return r + (y - r / 2); // steady
+  return duration - Math.sqrt(2 * r * Math.max(0, area - y)); // falling
+}
+
+// Lanes needed so that cubes in one lane are never closer than `gap` at the busiest moment,
+// which is `count / (duration - ramp)` cubes a second.
+function laneCount(count, { duration, ramp = 0 }, stream) {
+  const r = Math.min(Math.max(ramp, 0), duration / 2);
+  return Math.max(1, Math.ceil((stream.gap * count) / (stream.speed * (duration - r))));
+}
+
 // How far from the middle of the floor the outermost lane is.
-export function streamRadius(count, { duration, stream = STREAM }) {
-  const lanes = Math.max(1, Math.ceil((stream.gap * count) / (stream.speed * duration)));
+export function streamRadius(count, timing, stream = STREAM) {
+  const lanes = laneCount(count, timing, stream);
   return streamLanes(lanes, stream.spacing).reduce((far, p) => Math.max(far, Math.hypot(p.x, p.z)), 0);
 }
 
 // Where and when each cube is released: a stream down the lanes into the middle of the floor,
-// with cubes released evenly across `duration` seconds in random order. The same seed always
-// gives the same plan.
-export function spawnPlan(count, { duration, seed = ARENA.spawnSeed, stream = STREAM }) {
+// over `duration` seconds with a ramp at each end, in random order. The same seed always gives
+// the same plan.
+export function spawnPlan(count, { duration, ramp = 0, seed = ARENA.spawnSeed, stream = STREAM }) {
   const random = mulberry32(seed);
-  const interval = duration / count;
-  const lanes = Math.max(1, Math.ceil((stream.gap * count) / (stream.speed * duration)));
+  const lanes = laneCount(count, { duration, ramp }, stream);
   const positions = streamLanes(lanes, stream.spacing);
-  // A cube in release slot n goes down lane (n mod lanes) at time n * interval. The slot is a random
-  // permutation, so cubes of any species arrive in any order.
+  // A cube in release slot n goes down lane (n mod lanes) at the time slot n is due. The slot is a
+  // random permutation, so cubes of any species arrive in any order.
   const order = Array.from({ length: count }, (_, i) => i);
   for (let i = count - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
@@ -53,7 +72,7 @@ export function spawnPlan(count, { duration, seed = ARENA.spawnSeed, stream = ST
   return order.map((slot) => ({
     x: positions[slot % lanes].x,
     z: positions[slot % lanes].z,
-    delay: slot * interval,
+    delay: rampTime((slot + 0.5) / count, duration, ramp),
     velocity: { x: (random() - 0.5) * 2 * stream.drift, y: -stream.speed, z: (random() - 0.5) * 2 * stream.drift },
     quaternion: randomQuaternion(random),
     spin: { x: (random() - 0.5) * 6, y: (random() - 0.5) * 6, z: (random() - 0.5) * 6 },

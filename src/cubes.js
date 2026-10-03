@@ -141,9 +141,9 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
 
     // Release every cube from above the frame, staggered over `duration` seconds. Resolves
     // `settle` seconds after the last cube has been released.
-    drop(duration = DURATIONS.drop, settle = DURATIONS.dropSettle) {
+    drop(duration = DURATIONS.drop, settle = DURATIONS.dropSettle, ramp = DURATIONS.dropRamp) {
       field.clear();
-      const plan = spawnPlan(count, { duration });
+      const plan = spawnPlan(count, { duration, ramp });
       pending = plan.map((entry, i) => ({ i, entry })).sort((a, b) => a.entry.delay - b.entry.delay);
       clock = 0;
       return new Promise((resolve) => {

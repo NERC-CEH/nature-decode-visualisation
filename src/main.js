@@ -43,7 +43,7 @@ const theme = createTheme((colours) => {
 const arena = arenaSize(cube.cubes.length);
 const physics = createPhysics();
 physics.setBounds(arena.width, arena.depth);
-scene?.setArena({ ...arena, streamRadius: streamRadius(cube.cubes.length, { duration: DURATIONS.drop }) });
+scene?.setArena({ ...arena, streamRadius: streamRadius(cube.cubes.length, { duration: DURATIONS.drop, ramp: DURATIONS.dropRamp }) });
 const field = scene
   ? createCubeField({ scene: scene.scene, physics, cubes: cube.cubes, arena, getSpawnY: () => scene.spawnY })
   : null;
