@@ -283,7 +283,7 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 
 ### 7.8 Intro network
 
-- About 80 small wireframe cubes, each joined by thin white lines to its two nearest neighbours (nearest as seen on screen, so the lines are mostly short). Cubes are 0.5 to 1 unit across at a depth of 45 units, at 50% opacity.
+- About 80 small wireframe cubes, each joined by thin white lines to its two nearest neighbours (nearest as seen on screen, so the lines are mostly short). Cubes are 0.5 to 1 unit across at a depth of 45 units, at 10% opacity.
 - The network hangs in the camera's own space, so it fills the screen behind the title at any window shape and does not move with the floor camera.
 - Everything moves slowly: each cube sways by about 3.5% of the view on its own cycle of 30 s or so and turns slowly on its axes, and the whole cloud rocks gently back and forth, which gives it depth. The speed is a few pixels per second.
 - Layout, sizes and cycles are seeded, so the network looks the same each time the page loads.
@@ -412,6 +412,10 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - Verified in Edge from `file://`: 164 cubes released, all settle inside the walls; repulsion pushes only nearby cubes; Back lifts everything away and the cubes drop again on Next. Headless software rendering ran at 19 fps, so the 60 fps target still needs checking on a real GPU.
 
 - The intro network is built (7.8): `src/network.js`, tuned in `NETWORK` in `config.js`.
+
+- Release height is worked out from the real width of the stream: the lowest corner of a cube released anywhere in it must be above the top of the view, plus a margin of 1.5 units (about 23 units up for the default cube), so cubes are never seen appearing. A test frame 0.02 s after the release starts shows no cube in view.
+- Shadows fade in as the cubes fall: none at the release height, full strength within 3.5 units of the floor. The shadow map cannot be transparent, so each cube's shadow is dithered (a fraction of its pixels are dropped, by height) and the map's soft filtering turns that into a lighter shadow.
+- `?debug` also gives `pause()` and `advance(seconds)`, which stop the animation loop and step it by hand, so a frame can be captured at an exact time.
 
 ### M0 as built
 

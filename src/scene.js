@@ -89,16 +89,19 @@ export function createScene(container) {
     target.y = baseY + shiftHigh;
     place(far);
 
-    // Release height: cubes start just above the top of the view, over the nearest edge of the
-    // floor, which is the lowest part of the frame at any given height.
+    // Release height: the lowest point of a cube released anywhere in the stream (a cube turned
+    // any way reaches 0.87 below its centre) must be above the top of the view, with a margin of
+    // a cube or two so a slow frame cannot bring one into view.
+    const reach = arena.streamRadius ?? 0;
+    const streamCorners = [[-reach, -reach], [-reach, reach], [reach, -reach], [reach, reach]];
     let low = 1;
     let high = camera.position.distanceTo(target) * 4;
     for (let i = 0; i < 30; i++) {
       const mid = (low + high) / 2;
-      corner.set(width / 2, mid, depth / 2).project(camera);
-      if (corner.y > 1.2) high = mid; else low = mid;
+      const lowestEdge = Math.min(...streamCorners.map(([x, z]) => corner.set(x, mid - 1, z).project(camera).y));
+      if (lowestEdge > 1.04) high = mid; else low = mid;
     }
-    spawnY = high;
+    spawnY = high + 1.5;
     const half = Math.max(width, depth) * 0.75;
     Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 90 });
     sun.shadow.camera.updateProjectionMatrix();

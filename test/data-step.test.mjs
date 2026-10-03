@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { arenaSize, spawnPlan } from '../src/arena.js';
+import { arenaSize, spawnPlan, streamRadius } from '../src/arena.js';
 import { createPhysics } from '../src/physics.js';
 import { repel } from '../src/repulsion.js';
 import { createCubeField } from '../src/cubes.js';
@@ -244,4 +244,13 @@ test('dropping again starts from scratch', async () => {
   field.tick(0.2);
   await done;
   assert.equal(physics.bodies.length, count);
+});
+
+test('the stream radius matches the outermost lane of the plan', () => {
+  for (const count of [30, 164, 405]) {
+    const plan = spawnPlan(count, { duration: 1 });
+    const widest = Math.max(...plan.map((c) => Math.hypot(c.x, c.z)));
+    assert.ok(Math.abs(streamRadius(count, { duration: 1 }) - widest) < 1e-9);
+  }
+  assert.ok(streamRadius(164, { duration: 1 }) < 6, 'a narrow stream');
 });

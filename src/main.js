@@ -2,7 +2,7 @@
 
 import { STEPS, DURATIONS } from './config.js';
 import { readGlobalCube } from './data.js';
-import { arenaSize } from './arena.js';
+import { arenaSize, streamRadius } from './arena.js';
 import { createTheme } from './theme.js';
 import { createScene } from './scene.js';
 import { createPhysics } from './physics.js';
@@ -43,7 +43,7 @@ const theme = createTheme((colours) => {
 const arena = arenaSize(cube.cubes.length);
 const physics = createPhysics();
 physics.setBounds(arena.width, arena.depth);
-scene?.setArena(arena);
+scene?.setArena({ ...arena, streamRadius: streamRadius(cube.cubes.length, { duration: DURATIONS.drop }) });
 const field = scene
   ? createCubeField({ scene: scene.scene, physics, cubes: cube.cubes, arena, getSpawnY: () => scene.spawnY })
   : null;
@@ -76,19 +76,37 @@ const controller = createController({
 });
 ui.render(controller.state);
 
-// ?debug exposes the app to the browser console, for testing.
-if (location.search.includes('debug')) globalThis.__dataCube = { ctx, controller, arena };
-
-let last = performance.now();
-function frame(now) {
-  const dt = Math.min((now - last) / 1000, 0.1);
-  last = now;
+// Everything that changes from one frame to the next.
+function update(dt) {
   field?.tick(dt);
   network?.update(dt);
   const point = ctx.repel && scene?.floorPoint();
   if (point) repel(physics.bodies, point, dt);
   physics.step(dt);
   field?.sync();
+}
+
+// ?debug exposes the app to the browser console, for testing. pause() stops the animation
+// loop and advance(seconds) then steps it by hand, so a screenshot can be taken at an exact time.
+let paused = false;
+if (location.search.includes('debug')) {
+  globalThis.__dataCube = {
+    ctx,
+    controller,
+    arena,
+    pause: () => { paused = true; },
+    advance: (seconds) => {
+      for (let t = 0; t < seconds - 1e-9; t += 1 / 60) update(1 / 60);
+      scene?.render();
+    },
+  };
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  if (!paused) update(dt);
   scene?.render();
   requestAnimationFrame(frame);
 }

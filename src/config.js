@@ -70,7 +70,7 @@ export const NETWORK = {
   neighbours: 2, // each cube is joined to this many of its nearest cubes
   depth: 45,
   size: [0.5, 1.0], // cube edge, in units at that depth
-  opacity: 0.5,
+  opacity: 0.1,
   colour: '#FFFFFF',
   sway: 0.035,
   cycle: 30,

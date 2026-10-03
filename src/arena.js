@@ -29,6 +29,12 @@ export function streamLanes(count, spacing = STREAM.spacing) {
   });
 }
 
+// How far from the middle of the floor the outermost lane is.
+export function streamRadius(count, { duration, stream = STREAM }) {
+  const lanes = Math.max(1, Math.ceil((stream.gap * count) / (stream.speed * duration)));
+  return streamLanes(lanes, stream.spacing).reduce((far, p) => Math.max(far, Math.hypot(p.x, p.z)), 0);
+}
+
 // Where and when each cube is released: a stream down the lanes into the middle of the floor,
 // with cubes released evenly across `duration` seconds in random order. The same seed always
 // gives the same plan.

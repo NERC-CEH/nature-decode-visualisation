@@ -31,6 +31,39 @@ function edgeMaterial() {
   return material;
 }
 
+// The shadow a cube casts fades in as it falls: none at the release height, full strength once it
+// is within SHADOW_FULL of the floor. The shadow map has no transparency, so each cube's shadow
+// is dithered: a fraction of its shadow pixels are dropped, and the map's soft filtering turns
+// that into a lighter shadow.
+const SHADOW_FULL = 3.5;
+
+function shadowDepthMaterial(getFadeTop) {
+  const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uFadeBottom = { value: SHADOW_FULL };
+    shader.uniforms.uFadeTop = { value: 20 };
+    material.userData.uniforms = shader.uniforms;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vCubeHeight;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          vCubeHeight = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).y;
+        #else
+          vCubeHeight = 0.0;
+        #endif`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vCubeHeight;\nuniform float uFadeBottom;\nuniform float uFadeTop;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        float shadowStrength = 1.0 - smoothstep(uFadeBottom, uFadeTop, vCubeHeight);
+        float shadowNoise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (shadowNoise >= shadowStrength) discard;`);
+  };
+  material.syncFadeTop = () => {
+    if (material.userData.uniforms) material.userData.uniforms.uFadeTop.value = getFadeTop();
+  };
+  return material;
+}
+
 // `scene` is a THREE.Scene. `cubes` is the list from loadCube(). `getSpawnY` returns the height
 // above the visible frame to release cubes from.
 export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () => 20 }) {
@@ -38,6 +71,8 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), edgeMaterial(), count);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
+  const shadowMaterial = shadowDepthMaterial(() => getSpawnY());
+  mesh.customDepthMaterial = shadowMaterial;
   scene.add(mesh);
 
   // Per-cube state. `body` is set while physics owns the cube; `pose` while a tween does.
@@ -134,6 +169,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
 
     // Called every frame, after the physics step: copy poses to the instanced mesh.
     sync() {
+      shadowMaterial.syncFadeTop();
       for (let i = 0; i < count; i++) {
         const s = state[i];
         if (s.body) write(i, s.body.position, s.body.quaternion);
