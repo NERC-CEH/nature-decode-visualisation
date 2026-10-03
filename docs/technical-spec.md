@@ -230,7 +230,7 @@ Every cube is the same object throughout and belongs to one cell (species, time,
 - cannon-es world with a fixed step of 1/60 s. One world unit is one cube edge. Gravity starts at -30 units/s²: falls feel brisk at this scale. Tune by eye.
 - Cube bodies are boxes with friction 0.4 and restitution 0.2, so they tumble and settle like small plastic blocks. Sleeping is on, so settled cubes cost nothing.
 - **Bounds:** an invisible floor and four low invisible walls just outside the frame, so cubes never leave the view.
-- **Cursor repulsion:** raycast the pointer onto a horizontal plane at cube-centre height. Each frame, bodies within a radius of 3 units get an impulse away from the pointer, scaled by how close they are, plus a small random torque so they tumble. Woken bodies go back to sleep naturally. Touch (stretch) uses the touch point.
+- **Cursor repulsion:** raycast the pointer onto a horizontal plane at cube-centre height. Each frame, bodies within 4.5 units of the pointer are accelerated away from it, with a strength that falls off with the square of the distance, plus a small upward acceleration and random spin so they hop and tumble. The push is an acceleration, scaled by the frame time, so it feels the same at any frame rate. A cube at rest needs a push of more than about 12 units/s² (friction) to start moving, so far cubes stay still and near cubes are driven away. Woken bodies go back to sleep naturally. Touch (stretch) uses the touch point.
 - **Steering in Sort:** each cube gets a force toward its heap spot that weakens on arrival, so the heaps form by physics. A cap on speed prevents flying.
 - **Headless settle:** `physics.js` can step the world without rendering until every body sleeps (capped at 600 steps). Reduced motion uses this (11), and so does any end state that must be known in advance.
 
@@ -382,7 +382,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | Milestone | Content | Done when |
 |---|---|---|
 | M0 (built) | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
-| M1 | **Data**: drop, floor, walls, shadows, edge shader, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
+| M1 (built) | **Data**: drop, floor, walls, shadows, edge shader, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
 | M2 | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
@@ -391,6 +391,15 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M7 | Kiosk mode, reduced motion, no-WebGL fallback, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
 | M8 | Polish, performance, README, NOTICE, GitHub Pages | Runs on the latest Chrome, Edge, Firefox and Safari. Steady 60 fps on an integrated-GPU laptop. |
 | Stretch | Sound, mobile and touch, tooltips | – |
+
+### M1 as built
+
+- The floor is sized from the cube count at 6 square units per cube, 1.5 : 1 wide (about 37 × 25 units for 164 cubes), so the cubes read as small. The camera is fitted to it at any window shape, and cubes are released from just above the top of the view.
+- Cubes drop over 3 s in seeded random order and positions, so a given data file always drops the same way. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
+- Each cube has a thin darker edge drawn in its own shader (a darker version of its own colour), and the floor shows only the soft shadows. Cubes start near-black (`#111111`), not pure black, so the lighting still shows their shape.
+- Repulsion was tuned in a simulation (a resting cube next to a stationary cursor is driven out to the edge of the cursor's reach, about 6 units; a quick sweep nudges it 1 to 5 units). Final values are set by eye at review.
+- `?debug` on the page address exposes the app as `__dataCube` in the browser console, for testing.
+- Verified in Edge from `file://`: 164 cubes released, all settle inside the walls; repulsion pushes only nearby cubes; Back lifts everything away and the cubes drop again on Next. Headless software rendering ran at 19 fps, so the 60 fps target still needs checking on a real GPU.
 
 ### M0 as built
 

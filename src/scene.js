@@ -1,15 +1,12 @@
-// Three.js renderer, camera and sizing. Returns null when WebGL is unavailable, so the page
-// can fall back to text only (technical-spec 11).
-//
-// M0 draws a placeholder: the data cube's bounding box, turning slowly. The cubes, floor and
-// labels arrive with the step milestones.
+// Three.js renderer, camera, lights and floor. Returns null when WebGL is unavailable, so the
+// page can fall back to text only (technical-spec 11).
 
 import * as THREE from 'three';
-import { EDGE_COLOUR } from './config.js';
 
-const PITCH = 1.25; // distance between cube centres in the arranged cube (technical-spec 7.2)
+const ELEVATION = new THREE.Vector3(0, 0.8, 1).normalize(); // camera direction: raised three-quarter view
+const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
 
-export function createScene(container, { size }) {
+export function createScene(container) {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -17,37 +14,114 @@ export function createScene(container, { size }) {
     return null;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 500);
-  const edge = size * PITCH;
-  const box = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(edge, edge, edge)),
-    new THREE.LineBasicMaterial({ color: EDGE_COLOUR }));
-  scene.add(box);
+  const target = new THREE.Vector3(0, 0.5, 0);
 
-  // Fit the bounding sphere of the cube in view at any aspect ratio.
+  // Soft ambient light from above plus one key light that casts the shadows.
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  sun.position.set(-8, 22, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.bias = -0.0005;
+  scene.add(sun);
+
+  // The floor is invisible apart from the shadows that fall on it.
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.22 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  let arena = null;
+  let spawnY = 20;
+  const corner = new THREE.Vector3();
+
+  // The distance (along the viewing direction) at which the whole arena just fits in view.
+  function fit() {
+    if (!arena) return;
+    const { width, depth } = arena;
+    const corners = [];
+    for (const x of [-width / 2, width / 2]) {
+      for (const y of [0, 2]) {
+        for (const z of [-depth / 2, depth / 2]) corners.push([x, y, z]);
+      }
+    }
+    const place = (distance) => {
+      camera.position.copy(target).addScaledVector(ELEVATION, distance);
+      camera.lookAt(target);
+      camera.updateMatrixWorld();
+    };
+    const visible = (distance) => {
+      place(distance);
+      return corners.every((c) => {
+        corner.set(...c).project(camera);
+        return Math.abs(corner.x) <= FIT.x && Math.abs(corner.y) <= FIT.y;
+      });
+    };
+    let near = 5;
+    let far = 400;
+    for (let i = 0; i < 30; i++) {
+      const mid = (near + far) / 2;
+      if (visible(mid)) far = mid; else near = mid;
+    }
+    place(far);
+
+    // Release height: cubes start just above the top of the view, over the nearest edge of the
+    // floor, which is the lowest part of the frame at any given height.
+    // (Points higher than the camera itself would project upside down, so search below it.)
+    let low = 1;
+    let high = Math.max(2, camera.position.y - 2);
+    for (let i = 0; i < 30; i++) {
+      const mid = (low + high) / 2;
+      corner.set(width / 2, mid, depth / 2).project(camera);
+      if (corner.y > 1.2) high = mid; else low = mid;
+    }
+    spawnY = high;
+    const half = Math.max(width, depth) * 0.75;
+    Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 90 });
+    sun.shadow.camera.updateProjectionMatrix();
+  }
+
   function resize() {
     const width = Math.max(1, container.clientWidth);
     const height = Math.max(1, container.clientHeight);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    const vertical = (camera.fov * Math.PI) / 180;
-    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
-    const radius = edge * 0.87 * 1.15;
-    const distance = radius / Math.sin(Math.min(vertical, horizontal) / 2);
-    camera.position.set(0.6, 0.5, 0.75).normalize().multiplyScalar(distance);
-    camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
+    fit();
   }
   new ResizeObserver(resize).observe(container);
   resize();
 
+  // Where the cursor meets the plane through the cubes' centres, or null if it is off the stage.
+  const pointer = new THREE.Vector2();
+  let pointerOver = false;
+  container.addEventListener('pointermove', (e) => {
+    const rect = container.getBoundingClientRect();
+    pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    pointerOver = true;
+  });
+  container.addEventListener('pointerleave', () => { pointerOver = false; });
+  const raycaster = new THREE.Raycaster();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.5);
+  const hit = new THREE.Vector3();
+
   return {
+    scene,
+    camera,
+    setArena(size) { arena = size; fit(); },
+    get spawnY() { return spawnY; },
     setClearColour: (hex) => renderer.setClearColor(hex),
-    render(dt) {
-      box.rotation.y += dt * 0.2;
+    floorPoint() {
+      if (!pointerOver) return null;
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster.ray.intersectPlane(plane, hit) ? { x: hit.x, z: hit.z } : null;
+    },
+    render() {
       renderer.render(scene, camera);
     },
   };

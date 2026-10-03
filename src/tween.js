@@ -4,6 +4,7 @@ export const ease = {
   linear: (t) => t,
   inOutQuad: (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2),
   inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
+  inCubic: (t) => t * t * t,
   outCubic: (t) => 1 - (1 - t) ** 3,
 };
 

@@ -20,11 +20,32 @@ export function createPhysics(settings = PHYSICS) {
   world.addBody(floor);
 
   const bodies = [];
+  const walls = [];
   let accumulator = 0;
 
   return {
     world,
     bodies,
+
+    // Four invisible walls around a floor of the given size, centred on the origin, so cubes
+    // stay in view. Each wall is a plane whose normal points into the arena.
+    setBounds(width, depth) {
+      for (const wall of walls) world.removeBody(wall);
+      walls.length = 0;
+      const planes = [
+        [-width / 2, 0, [0, Math.PI / 2, 0]],
+        [width / 2, 0, [0, -Math.PI / 2, 0]],
+        [0, -depth / 2, [0, 0, 0]],
+        [0, depth / 2, [0, Math.PI, 0]],
+      ];
+      for (const [x, z, euler] of planes) {
+        const wall = new CANNON.Body({ type: CANNON.Body.STATIC, material: cubeMaterial, shape: new CANNON.Plane() });
+        wall.position.set(x, 0, z);
+        wall.quaternion.setFromEuler(...euler);
+        world.addBody(wall);
+        walls.push(wall);
+      }
+    },
 
     addCube(position, quaternion) {
       const body = new CANNON.Body({
@@ -39,6 +60,12 @@ export function createPhysics(settings = PHYSICS) {
       world.addBody(body);
       bodies.push(body);
       return body;
+    },
+
+    removeCube(body) {
+      world.removeBody(body);
+      const i = bodies.indexOf(body);
+      if (i >= 0) bodies.splice(i, 1);
     },
 
     // Advance by real elapsed seconds, in fixed steps.

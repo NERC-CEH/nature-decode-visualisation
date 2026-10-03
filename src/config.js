@@ -40,14 +40,34 @@ export const PHYSICS = {
 // Durations in seconds (technical-spec 6.2). Starting values, tuned by eye.
 export const DURATIONS = {
   theme: 1.0,
+  drop: 3.0, // cubes spawn, staggered, over this time
+  dropSettle: 0.5, // extra wait after the last cube spawns before the step is ready
+  lift: 1.2, // cubes rise out of view on Back
+};
+
+// The floor the cubes fall onto. Sized from the cube count; one world unit is one cube edge.
+export const ARENA = {
+  aspect: 1.5, // width / depth
+  areaPerCube: 6, // floor area for every cube, in square units
+  margin: 1.2, // spawn this far inside the walls
+  spawnSeed: 1, // spawn positions repeat for a given data file
+};
+
+// Cursor repulsion (technical-spec 7.1). Accelerations are per second, so the push is the same at
+// any frame rate. A cube at rest needs a push of more than about 12 (friction) to start moving.
+export const REPEL = {
+  radius: 4.5, // floor units around the cursor
+  push: 120, // sideways acceleration at the cursor, falling off with distance squared
+  lift: 25, // upward acceleration, which eases the cube's grip on the floor so it slides and hops
+  spin: 16, // random angular acceleration, so cubes tumble
 };
 
 export const SIMULATED_NOTE = 'Simulated data.';
 export const TAGLINE = 'Our planet. Decoded.';
 
 // One entry per step, in order. `theme` is the page colour for that step.
-// `canvasLabel` describes the 3D scene for screen readers. `summary` is the plain-text
-// description of the pattern an Insight shows.
+// `repel` marks steps where the cursor pushes the cubes. `canvasLabel` describes the 3D scene
+// for screen readers. `summary` is the plain-text description of the pattern an Insight shows.
 export const STEPS = [
   {
     id: 'intro',
@@ -61,6 +81,7 @@ export const STEPS = [
     title: 'Data',
     text: 'Every record of wildlife is a data point. Smartphone apps and surveys now collect them in large numbers. On their own, they are scattered and hard to read.',
     theme: 'light',
+    repel: true,
     canvasLabel: 'Many small black cubes fall and scatter across the floor.',
   },
   {
@@ -68,6 +89,7 @@ export const STEPS = [
     title: 'Categorise',
     text: 'Each record names a species. We give each species its own colour.',
     theme: 'light',
+    repel: true,
     canvasLabel: 'The scattered cubes take on a different colour for each species.',
   },
   {
@@ -75,6 +97,7 @@ export const STEPS = [
     title: 'Sort',
     text: 'We group the records by species. Some species have many records. Others have few.',
     theme: 'light',
+    repel: true,
     canvasLabel: 'The cubes gather into one heap per species, so each heap has a single colour.',
   },
   {
