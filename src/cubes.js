@@ -8,7 +8,6 @@ import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
 import { ARENA, DURATIONS, PHYSICS } from './config.js';
 import { mulberry32 } from './random.js';
-import { pop } from './repulsion.js';
 
 export const START_COLOUR = '#111111'; // near-black, so lighting still shows the cube's shape
 const LIFT_HEIGHT = 40; // how far cubes rise when they leave
@@ -167,40 +166,26 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     },
 
     // Every cube changes to the colour `targetOf(i)` returns, each at its own random moment and
-    // all at once (there is no fade), so the change sweeps over the cubes in no order. All are
-    // done within `total` seconds. The order is the same every time. `each` is how long a cube's
-    // push lasts (see below): the colour changes in the middle of it.
-    // With \`popPower\` above zero each cube also gets a brief push while it changes (see POP).
-    recolour(targetOf, total = DURATIONS.categorise, each = DURATIONS.categoriseEach, popPower = 0) {
+    // instantly (there is no fade), so the change sweeps over the cubes in no order. All are done
+    // within `total` seconds. The order is the same every time.
+    recolour(targetOf, total = DURATIONS.categorise) {
       recolouring?.cancel();
       const random = mulberry32(ARENA.spawnSeed + 11);
       const from = [];
       const to = [];
       const start = [];
-      const angle = [];
       for (let i = 0; i < count; i++) {
         mesh.getColorAt(i, colour);
         from.push(colour.clone());
         to.push(new THREE.Color(targetOf(i)));
-        start.push(random() * Math.max(0, total - each));
-        angle.push(random() * 2 * Math.PI);
+        start.push(random() * total);
       }
-      let last = 0;
       recolouring = tween({
         duration: total,
         easing: ease.linear,
         onUpdate: (progress) => {
           const time = progress * total;
-          const frame = Math.min(0.1, time - last);
-          last = time;
-          for (let i = 0; i < count; i++) {
-            const local = each > 0 ? Math.min(1, Math.max(0, (time - start[i]) / each)) : 1;
-            mesh.setColorAt(i, local >= 0.5 ? to[i] : from[i]);
-            // a push that rises and falls over the moment of the change
-            if (popPower > 0 && local > 0 && local < 1 && state[i].body) {
-              pop(state[i].body, angle[i], popPower * Math.sin(Math.PI * local), frame);
-            }
-          }
+          for (let i = 0; i < count; i++) mesh.setColorAt(i, time >= start[i] ? to[i] : from[i]);
           mesh.instanceColor.needsUpdate = true;
         },
       });

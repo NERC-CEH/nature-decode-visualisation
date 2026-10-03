@@ -44,8 +44,7 @@ export const DURATIONS = {
   dropRamp: 1.0, // ...ramping up over the first and down over the last this many seconds
   dropSettle: 0.5, // extra wait after the last cube spawns before the step is ready
   lift: 1.2, // cubes rise out of view on Back
-  categorise: 2.0, // every cube has taken its species colour within this time...
-  categoriseEach: 0.3, // ...and each cube gets its push over this long, changing colour in the middle of it
+  categorise: 2.0, // every cube has taken its species colour within this time, each at its own random moment
   categoriseBack: 1.0, // and on Back, the colours drain away within this time
 };
 
@@ -65,15 +64,6 @@ export const STREAM = {
   spacing: 1.25, // spiral spacing of the lanes, which sets how wide the stream is
   drift: 2, // random sideways speed at release, so the pile spreads
   variation: 0.5, // the release rate and the width (area) of the stream each vary by up to this share
-};
-
-// When a cube takes its species colour it gets a brief push, like a kernel of popcorn going off:
-// the cursor's push (REPEL) in a random direction, at this share of its power, rising and falling
-// over a third of a second with the colour changing at the peak. A resting cube needs a push of
-// more than about 10% of the cursor's before it moves at all, and 20% does nothing visible; 0.55
-// slides a lone cube about 2 units, and 1.65 (three times that) sends it across the floor.
-export const POP = {
-  power: 1.65,
 };
 
 // The network of wireframe cubes behind the title on the opening screen. It hangs this many

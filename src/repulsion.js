@@ -31,15 +31,3 @@ export function repel(bodies, point, dt, settings = REPEL, random = Math.random)
   }
   return pushed;
 }
-
-// A brief push on one cube, as the cursor gives when it is right on top of the cube: along
-// `direction` (an angle, in radians, round the vertical), at `power` of the cursor's strength.
-export function pop(body, angle, power, dt, settings = REPEL, random = Math.random) {
-  if (body.type !== Body.DYNAMIC) return;
-  const k = power * dt;
-  body.wakeUp();
-  body.applyImpulse({ x: Math.cos(angle) * settings.push * k, y: settings.lift * k, z: Math.sin(angle) * settings.push * k });
-  body.angularVelocity.x += (random() - 0.5) * settings.spin * k;
-  body.angularVelocity.y += (random() - 0.5) * settings.spin * k;
-  body.angularVelocity.z += (random() - 0.5) * settings.spin * k;
-}
