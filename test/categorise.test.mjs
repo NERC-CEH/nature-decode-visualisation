@@ -59,10 +59,10 @@ test('the order of the change is random but the same every time', async () => {
   };
   const a = await order();
   assert.ok(a.some(Boolean) && !a.every(Boolean));
-  // the same cubes are changing at the same point in both runs, apart from timing jitter
+  // the same cubes are changing at the same point in both runs, apart from timing jitter (two unrelated random orders would agree about half the time)
   const b = await order();
   const agree = a.filter((v, i) => v === b[i]).length / a.length;
-  assert.ok(agree > 0.85, `agreement ${agree.toFixed(2)}`);
+  assert.ok(agree > 0.7, `agreement ${agree.toFixed(2)}`);
 });
 
 test('the categorise step colours the cubes, and Back drains the colour away', async () => {

@@ -100,7 +100,7 @@ test('sorting pulls the cubes into heaps, each in its own spot', async () => {
   const done = field.steer((i) => spots[cube.cubes[i].species], 3, 0);
   let finished = false;
   done.then(() => { finished = true; });
-  for (let s = 0; s < 8 && !finished; s += 0.5) {
+  for (let s = 0; s < 14 && !finished; s += 0.5) { // a bigger floor takes longer to cross; the pull gives up after 10 s
     frames(field, physics, 0.5);
     await new Promise((r) => setTimeout(r, 0));
   }
@@ -124,7 +124,9 @@ test('Back restores the scatter that the Categorise step ended with', async () =
   const snapshot = field.capture();
   const spots = heapSpots(arena, cube.displayOrder);
   const done = field.steer((i) => spots[cube.cubes[i].species], 1, 0);
-  for (let s = 0; s < 5; s += 0.5) {
+  let finished = false;
+  done.then(() => { finished = true; });
+  for (let s = 0; s < 14 && !finished; s += 0.5) {
     frames(field, physics, 0.5);
     await new Promise((r) => setTimeout(r, 0));
   }

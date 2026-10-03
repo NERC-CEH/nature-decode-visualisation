@@ -15,7 +15,7 @@ test('loadCube derives one cube per record', () => {
   const cube = loadCube(raw());
   const records = raw().data.flat(2).reduce((a, b) => a + b, 0);
   assert.equal(cube.cubes.length, records);
-  assert.equal(cube.size, 9);
+  assert.equal(cube.size, raw().meta.size);
   assert.deepEqual(cube.cubes.map((c) => c.id), cube.cubes.map((_, i) => i));
 });
 
@@ -23,12 +23,12 @@ test('loadCube rejects bad data with a clear message', () => {
   assert.throws(() => loadCube(undefined), /no data found/);
   const wrongSize = raw();
   wrongSize.data.pop();
-  assert.throws(() => loadCube(wrongSize), /expected 9 species layers/);
+  assert.throws(() => loadCube(wrongSize), new RegExp(`expected ${raw().meta.size} species layers`));
   const nonBinary = raw();
   nonBinary.data[0][0][0] = 2;
   assert.throws(() => loadCube(nonBinary), /expected 0 or 1/);
   const badOrder = raw();
-  badOrder.meta.displayOrder = [0, 0, 1, 2, 3, 4, 5, 6, 7];
+  badOrder.meta.displayOrder = badOrder.meta.displayOrder.map(() => 0);
   assert.throws(() => loadCube(badOrder), /displayOrder/);
 });
 
