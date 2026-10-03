@@ -55,12 +55,13 @@ export const ARENA = {
 
 // The drop is a stream of cubes pouring into the middle of the floor. Cubes are released down
 // several side-by-side lanes at once, with a downward speed that keeps cubes in the same lane
-// apart, so none start inside another.
+// apart, so none start inside another. The rate and width of the stream wander at random.
 export const STREAM = {
   speed: 28, // downward speed at release, units/s
   gap: 1.8, // least distance between cubes in one lane at release (a turned cube is up to 1.73 across)
   spacing: 1.25, // spiral spacing of the lanes, which sets how wide the stream is
   drift: 2, // random sideways speed at release, so the pile spreads
+  variation: 0.5, // the release rate and the width (area) of the stream each vary by up to this share
 };
 
 // The network of wireframe cubes behind the title on the opening screen. It hangs this many
