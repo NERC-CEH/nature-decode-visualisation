@@ -21,6 +21,7 @@ export function createPhysics(settings = PHYSICS) {
 
   const bodies = [];
   const walls = [];
+  const hooks = [];
   let accumulator = 0;
 
   return {
@@ -68,10 +69,17 @@ export function createPhysics(settings = PHYSICS) {
       if (i >= 0) bodies.splice(i, 1);
     },
 
+    // Run `fn(stepSeconds)` before every fixed step of step(), so forces that act on the cubes
+    // are the same at any frame rate (a slow frame is several fixed steps).
+    onStep(fn) {
+      hooks.push(fn);
+    },
+
     // Advance by real elapsed seconds, in fixed steps.
     step(dt) {
       accumulator = Math.min(accumulator + dt, 0.1);
       while (accumulator >= settings.step) {
+        for (const hook of hooks) hook(settings.step);
         world.step(settings.step);
         accumulator -= settings.step;
       }

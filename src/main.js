@@ -9,6 +9,7 @@ import { createPhysics } from './physics.js';
 import { createCubeField } from './cubes.js';
 import { createNetwork } from './network.js';
 import { repel } from './repulsion.js';
+import { heapSpots } from './steering.js';
 import { createController } from './controller.js';
 import { buildSteps } from './steps/index.js';
 import { createUi } from './ui.js';
@@ -52,6 +53,7 @@ const network = scene ? createNetwork({ scene: scene.scene, camera: scene.camera
 
 const ctx = {
   cube,
+  arena,
   scene,
   physics,
   field,
@@ -95,6 +97,7 @@ if (location.search.includes('debug')) {
     controller,
     arena,
     speciesColour,
+    spots: heapSpots(arena, cube.displayOrder),
     pause: () => { paused = true; },
     advance: (seconds) => {
       for (let t = 0; t < seconds - 1e-9; t += 1 / 60) update(1 / 60);

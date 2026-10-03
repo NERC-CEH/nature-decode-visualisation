@@ -197,7 +197,7 @@ Generator tasks (M0):
 |---|---|---|
 | Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 2 s, ramping up for the first second and down for the last. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
 | Data → Categorise | Random-order recolour, 2 s total, each cube 0.3 s | Recolour to black, 1 s |
-| Categorise → Sort | Cubes slide to their heap spots and tumble in, 3 s | Ease to the Categorise snapshot, 1.2 s |
+| Categorise → Sort | Cubes are pulled to their heap spots and pile up, 3 s, plus up to 2 s for stragglers | Ease to the Categorise snapshot, 1.2 s |
 | Sort → Arrange | Each heap rises in turn and spreads into its sheet, 3.5 s | Ease to the Sort snapshot, 1.5 s |
 | Arrange → Insight 1 → 2 → 3 | Cube rotation plus camera change, 1.5 s each | Same, reversed |
 | Insight 3 → Finale | Background eases from white to black while the cubes fly to the logo dots (3 s), then the lock-up fades in (1 s) | Same, reversed |
@@ -217,7 +217,7 @@ Generator tasks (M0):
 | 0 | Intro | Title and line fade in on black, over a slowly drifting network of small wireframe cubes joined by thin lines (7.8). | Next. |
 | 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 2 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
 | 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. | Cursor repels cubes. |
-| 3 | **Sort** | Cubes are steered to one spot per species, in a row across the floor in display order, and tumble into heaps there. No labels. | Cursor repels cubes. |
+| 3 | **Sort** | Cubes are pulled to one spot per species, spread across the floor in display order (in two alternating rows), and pile into heaps there. No labels. | Cursor repels cubes. |
 | 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box and axis titles fade in. | Drag to rotate. Spring back. |
 | 5 | **Insights 1** | The cube turns to the side face. Face rendering starts (7.4). | Drag to rotate. Spring back. |
 | 6 | **Insights 2** | Turns to the top face. | As above. |
@@ -396,7 +396,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M0 (built) | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
 | M1 (built) | **Data**: drop, floor, walls, shadows, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
 | M2 (built) | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
-| M3 | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
+| M3 (built) | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
 | M5 | **Insights** ×3: turns, orthographic hand-over, face blending, key | Each face shows its claim at a glance. |
 | M6 | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
@@ -422,6 +422,16 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - The release rate ramps up over the first second and down over the last (`DURATIONS.dropRamp`, 1 s), so the stream starts and tails off like a pour. The release lasts 2 s (`DURATIONS.drop`), so the two ramps meet and the flow is a triangle that peaks at 1 s at about 164 cubes a second. The default cube has released 1, 7, 20, 46 and 82 cubes by 0.1, 0.3, 0.5, 0.75 and 1 s, and 159 by 1.75 s. A drop longer than twice the ramp leaves a steady flow between the ramps; a ramp longer than half the drop is cut to half. (An earlier version dropped the cubes in 1 s with 0.5 s ramps, which made the stream wider because the lanes are sized for the peak rate.) The lanes are sized for the peak rate, so no cube starts inside another.
 
 - The pour varies at random (`STREAM.variation`, 0.5): the release rate and the width of the stream each wander by up to 50% either way, on slow cycles of roughly half a second to two seconds, on top of the ramps. The width is the number of lanes in use, taken from the inside of the spiral outward, so the stream's area really does change by up to 50%. The release time of each cube is read from the tabulated, randomised flow. When the stream is narrow and the flow is high, a cube waits for a free lane (so no cube is ever released inside another), which flattens the peaks a little and makes the pour end up to about 0.6 s after its planned time. Up to 50% more lanes than the plain pour need are available, so the widest the stream gets is about 5 units from the middle for 164 cubes. Everything is seeded, so a given data file always pours the same way. For the default cube, cubes released in successive 0.2 s windows run 4, 11, 12, 19, 41, 23, 21, 21, 9, 3, using 4 to 14 lanes.
+
+### M3 as built
+
+- **Heap spots** (`heapSpots` in `src/steering.js`): one per species, spread across 88% of the floor's width in display order (left to right), in two rows 10 units apart that alternate from heap to heap (z = 0 and z = 10), so neighbouring heaps are at least 7 units apart. A single straight row was tried first: the heaps in the middle built up as walls in the path of the cubes bound for the far heaps, and only about 10% of the cubes reached their own heap in the time.
+- **The pull:** every cube is accelerated across the floor towards its heap spot. It builds up over 0.4 s and eases off over 0.6 s of a 3 s main pull. It never drops below 120 units/s² (about ten times the floor's friction), so cubes shove through and keep sliding in until the cubes ahead stop them, and drag (6 per second) caps the speed at about 20 units/s. Within 2 units of the heap spot the pull fades out, so the cubes stop short of the exact middle and the heap spreads into a mound. Without that fade, heaps built up as columns up to 6.5 cubes tall; with it the tallest is about 3.5.
+- **Stragglers:** after the main pull, cubes still more than 5 units from their heap keep being pulled, for up to 2 s more, until no more than 3% are still on their way. The step is ready 0.5 s after that, so the whole step takes about 3.5 s, up to 5.5 s.
+- **Fixed steps:** the pull is applied before every fixed physics step (`physics.onStep`), not once a frame. Applied once a frame, a slow frame gave a pull ten times too big in one go and the cubes tunnelled through each other.
+- **Results:** in a simulation of the whole drop and sort with the default data, 154 to 160 of the 164 cubes finish nearer their own heap than any other, and 150 to 157 within 5 units of it. In the browser 156 of 164 were nearer their own heap and 156 within 5 units.
+- **Back:** physics cannot be rewound, so the cubes are eased from where they are back to the poses recorded when the Categorise step ended (1.2 s, with a turn between each cube's two orientations) and then handed back to physics. 164 of 164 cubes came back to within 0.5 units of where they had been, with their colours.
+- The cursor still pushes cubes during Sort (the push is a fraction of the pull, so cubes near the cursor are knocked about and then drawn back).
 
 ### M2 as built
 

@@ -46,6 +46,9 @@ export const DURATIONS = {
   lift: 1.2, // cubes rise out of view on Back
   categorise: 2.0, // every cube has taken its species colour within this time, each at its own random moment
   categoriseBack: 1.0, // and on Back, the colours drain away within this time
+  sort: 3.0, // the cubes are pulled into their heaps for this long...
+  sortSettle: 0.5, // ...and the step is ready this long after the pull ends
+  sortBack: 1.2, // on Back the cubes ease back to where they were
 };
 
 // The floor the cubes fall onto. Sized from the cube count; one world unit is one cube edge.
@@ -89,6 +92,33 @@ export const NETWORK = {
   spring: 5,
   damping: 3.5,
   maxPush: 14,
+};
+
+// The Sort step pulls every cube across the floor towards the heap for its species. The pull is
+// an acceleration in units/s^2 that never drops below `base` (far more than the floor's friction,
+// so cubes shove through and keep sliding until the cubes ahead stop them, which builds a heap
+// rather than a flat patch), grows by `k` for every unit of distance and is capped at `max`.
+// `drag` slows sideways speed, which caps the speed of a cube at about base / drag units/s. The
+// pull fades out within `heapRadius` of the heap, so the heap spreads into a mound, not a column. The
+// pull builds up over `rampIn` seconds and eases off over `rampOut`. After the main pull, cubes
+// still further than `farRadius` from their heap keep being pulled, for up to `stragglers` more
+// seconds, until no more than `farShare` of the cubes are still on their way. Heaps are spread
+// over `spread` of the floor's width, in two rows: `rowZ` is the middle of the two rows and
+// neighbouring heaps are `zigzag` units either side of it, which gives each heap more room.
+export const SORT = {
+  base: 120,
+  k: 10,
+  max: 300,
+  drag: 6,
+  heapRadius: 2,
+  rampIn: 0.4,
+  rampOut: 0.6,
+  farRadius: 5,
+  farShare: 0.03,
+  stragglers: 2,
+  spread: 0.88,
+  rowZ: 5,
+  zigzag: 5,
 };
 
 // Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.

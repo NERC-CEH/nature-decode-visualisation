@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
-import { ARENA, DURATIONS, PHYSICS } from './config.js';
+import { ARENA, DURATIONS, PHYSICS, SORT } from './config.js';
+import { steer, steerStrength } from './steering.js';
 import { mulberry32 } from './random.js';
 
 export const START_COLOUR = '#111111'; // near-black, so lighting still shows the cube's shape
@@ -64,6 +65,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   let pending = []; // cubes waiting to drop, with their plan entries
   let onDropped = null;
   let recolouring = null;
+  let steering = null; // { targets, elapsed, total, done } while the Sort pull is running
 
   function hide(i) {
     dummy.position.set(0, -100, 0);
@@ -101,6 +103,32 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     state[i].body = body;
   }
 
+  // One frame of the Sort pull. For the first `total` seconds every cube is pulled to its heap
+  // with a strength that builds up and eases off; after that only cubes that are still far from
+  // their heap are pulled, until nearly all have arrived or the extra time is used up.
+  function steerCubes(dt) {
+    const pull = steering;
+    pull.elapsed += dt;
+    const main = pull.elapsed < pull.total;
+    const strength = main ? steerStrength(pull.elapsed, pull.total) : 1;
+    let far = 0;
+    for (let i = 0; i < count; i++) {
+      const body = state[i].body;
+      if (!body) continue;
+      const target = pull.targets[i];
+      const isFar = Math.hypot(target.x - body.position.x, target.z - body.position.z) > SORT.farRadius;
+      if (isFar) far++;
+      if (main || isFar) steer(body, target, dt, strength, SORT);
+    }
+    if (!main && (far <= count * SORT.farShare || pull.elapsed >= pull.total + SORT.stragglers)) {
+      steering = null;
+      setTimeout(pull.done, pull.settle * 1000);
+    }
+  }
+
+  // The pull is applied before every fixed physics step, so it is the same at any frame rate.
+  physics.onStep((dt) => { if (steering) steerCubes(dt); });
+
   const field = {
     mesh,
     count,
@@ -117,6 +145,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       }
       pending = [];
       onDropped = null;
+      steering = null;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     },
@@ -206,6 +235,61 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
           q: { x: q.x, y: q.y, z: q.z, w: q.w },
           colour: `#${colour.getHexString()}`,
         };
+      });
+    },
+
+    // Pull every cube across the floor to the spot `targetOf(i)` ({ x, z }) gives, so that the cubes
+    // pile up there by physics. Resolves `settle` seconds after the pull ends.
+    steer(targetOf, total = DURATIONS.sort, settle = DURATIONS.sortSettle) {
+      const targets = Array.from({ length: count }, (_, i) => targetOf(i));
+      return new Promise((resolve) => {
+        steering = { targets, elapsed: 0, total, settle, done: resolve };
+      });
+    },
+
+    // Ease every cube from where it is to where `snapshot` (from capture()) has it, then hand it
+    // back to physics. Physics cannot be rewound, so this is how Back returns to a step.
+    restore(snapshot, seconds = DURATIONS.sortBack) {
+      steering = null;
+      const moving = [];
+      state.forEach((s, i) => {
+        const to = snapshot?.[i];
+        if (!to?.spawned) return;
+        const body = s.body;
+        const from = body
+          ? { p: { x: body.position.x, y: body.position.y, z: body.position.z }, q: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w } }
+          : s.pose;
+        if (!from) return;
+        if (body) physics.removeCube(body);
+        s.body = null;
+        s.pose = { p: { ...from.p }, q: { ...from.q } };
+        setColour(i, to.colour);
+        moving.push({ i, from, to });
+      });
+      mesh.instanceColor.needsUpdate = true;
+      const fromQ = new THREE.Quaternion();
+      const toQ = new THREE.Quaternion();
+      return tween({
+        duration: seconds,
+        easing: ease.inOutCubic,
+        onUpdate: (t) => {
+          for (const { i, from, to } of moving) {
+            const pose = state[i].pose;
+            pose.p.x = from.p.x + (to.p.x - from.p.x) * t;
+            pose.p.y = from.p.y + (to.p.y - from.p.y) * t;
+            pose.p.z = from.p.z + (to.p.z - from.p.z) * t;
+            fromQ.set(from.q.x, from.q.y, from.q.z, from.q.w);
+            toQ.set(to.q.x, to.q.y, to.q.z, to.q.w);
+            fromQ.slerp(toQ, t);
+            pose.q.x = fromQ.x; pose.q.y = fromQ.y; pose.q.z = fromQ.z; pose.q.w = fromQ.w;
+          }
+          field.sync();
+        },
+      }).finished.then(() => {
+        for (const { i, to } of moving) {
+          state[i].body = physics.addCube(to.p, to.q);
+          state[i].pose = null;
+        }
       });
     },
 
