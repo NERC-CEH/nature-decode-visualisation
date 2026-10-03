@@ -17,6 +17,7 @@
   "devDependencies": {
     "cannon-es": "0.20.0",
     "esbuild-wasm": "0.28.2",
+    "pngjs": "7.0.0",
     "three": "0.186.1"
   }
 }

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { CAMERA, CUBE, FACE } from './config.js';
 import { tween, ease } from './tween.js';
-import { interpolateView } from './views.js';
+import { interpolateView, visibleHeight } from './views.js';
 
 const toRadians = (degrees) => (degrees * Math.PI) / 180;
 const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
@@ -195,7 +195,11 @@ export function createScene(container) {
     camera.updateProjectionMatrix();
     refit();
   }
-  new ResizeObserver(resize).observe(container);
+  const resizeListeners = [];
+  new ResizeObserver(() => {
+    resize();
+    for (const fn of resizeListeners) fn();
+  }).observe(container);
   resize();
 
   // Where the cursor is, in view coordinates (-1..1 across and up), if it is over the stage.
@@ -224,6 +228,18 @@ export function createScene(container) {
     setCubeFrame(size) { frame = size; refit(); },
     get spawnY() { return spawnY; },
     setClearColour: (hex) => renderer.setClearColor(hex),
+
+    // The size of the stage in pixels and how big a pixel is, in world units, at the middle of the
+    // cube in the face view (which is where the finale puts the logo).
+    stage() {
+      const width = Math.max(1, container.clientWidth);
+      const height = Math.max(1, container.clientHeight);
+      return { width, height, unitsPerPixel: views.face ? visibleHeight(views.face) / height : 0.02 };
+    },
+    // Called when the stage changes size.
+    onResize(fn) {
+      resizeListeners.push(fn);
+    },
 
     // Move the camera to the "floor" or "cube" view over `seconds`.
     setView(name, seconds) {

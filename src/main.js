@@ -10,6 +10,8 @@ import { createCubeField } from './cubes.js';
 import { createNetwork } from './network.js';
 import { createRotation } from './rotate.js';
 import { createFrame } from './frame.js';
+import { createLogo, logoLayout } from './finale.js';
+import logoDots from './logoDots.js';
 import { arrangement, cubeFrame } from './layout.js';
 import { repel } from './repulsion.js';
 import { heapSpots } from './steering.js';
@@ -69,10 +71,18 @@ const frame = scene
     },
   })
   : null;
+const logo = createLogo(document.getElementById('logo'));
 const rotation = scene
   ? createRotation({ element: document.getElementById('canvas-wrap'), pivot: scene.pivot })
   : null;
 scene?.pivot.position.set(0, cubeBox.centreY, 0);
+scene?.onResize(() => {
+  if (ctx.finaleLayout && logo.amount > 0) {
+    const stage = scene.stage();
+    ctx.finaleLayout = logoLayout({ stage, image: logoDots.image, dots: logoDots.dots, unitsPerPixel: stage.unitsPerPixel });
+    logo.place(ctx.finaleLayout.rect);
+  }
+});
 scene?.cubeGroup.position.set(0, -cubeBox.centreY, 0);
 
 const network = scene ? createNetwork({ scene: scene.scene, camera: scene.camera }) : null;
@@ -86,19 +96,24 @@ const ctx = {
   network,
   frame,
   rotation,
+  logo,
+  cubeCentre: cubeBox.centreY,
   repel: false, // set from the current step
-  setTheme: (name) => theme.animateTo(name, DURATIONS.theme),
+  setTheme: (name, seconds = DURATIONS.theme) => theme.animateTo(name, seconds),
   capture: () => field?.capture() ?? [],
-  reset: () => Promise.all([
-    field?.liftAway(DURATIONS.lift),
-    frame?.fadeTo(0, DURATIONS.frameFade / 2),
-    frame?.hideFaceTitles(0.2),
-    scene?.setView('floor', DURATIONS.lift),
-    scene?.fadeShadow(1, DURATIONS.lift),
-    rotation?.setTarget({ yaw: 0, pitch: 0 }),
-    theme.animateTo(steps[0].theme, DURATIONS.theme),
-    network?.fadeTo(1, DURATIONS.theme),
-  ]),
+  reset: async () => {
+    await logo.fadeTo(0, 0.6);
+    field?.clear();
+    rotation?.setTarget({ yaw: 0, pitch: 0 });
+    await Promise.all([
+      frame?.fadeTo(0, 0.2),
+      frame?.hideFaceTitles(0.2),
+      scene?.setView('floor', DURATIONS.theme),
+      scene?.fadeShadow(1, DURATIONS.theme),
+      theme.animateTo(steps[0].theme, DURATIONS.theme),
+      network?.fadeTo(1, DURATIONS.theme),
+    ]);
+  },
 };
 
 const controller = createController({
@@ -132,6 +147,7 @@ if (location.search.includes('debug')) {
     controller,
     arena,
     speciesColour,
+    DURATIONS,
     spots: heapSpots(arena, cube.displayOrder),
     cells: arrangement(cube.cubes, cube.displayOrder, cube.size),
     pause: () => { paused = true; },

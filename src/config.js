@@ -50,6 +50,9 @@ export const DURATIONS = {
   sortSettle: 0.5, // ...and the step is ready this long after the pull ends
   sortBack: 1.2, // on Back the cubes ease back to where they were
   look: 1.0, // cubes change between solid and see-through, and between colours and grey
+  finale: 3.0, // the cubes fly to the dots of the logo, and the page fades to black, over this time...
+  logoFade: 1.0, // ...then the logo lock-up fades in over the dots in this time
+  finaleBack: 2.5, // on Back the cubes fly back to the cube
   arrange: 3.5, // every cube is in its cell within this time: heaps lift one after another...
   arrangeFlight: 1.5, // ...and each cube takes this long to fly to its cell
   arrangeFrame: 2.0, // the frame (box, arrow and titles) starts to fade in this long after the lift starts...
@@ -141,6 +144,12 @@ export const CUBE = {
   margin: 0.88,
   yaw: -0.55,
   tilt: 0.05,
+};
+
+// The logo in the finale: the lock-up image fills this share of the stage, as far as its shape
+// allows. The cubes become the dots of the symbol and are drawn flat white, as in the logo.
+export const LOGO = {
+  fraction: 0.62,
 };
 
 // The face views (the Insights): the camera looks straight at a face of the cube through a view

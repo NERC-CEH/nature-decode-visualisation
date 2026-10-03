@@ -51,7 +51,17 @@ function shadowDepthMaterial(getFadeTop) {
 export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () => 20 }) {
   const count = cubes.length;
   const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 });
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, count);
+  // How far the cubes have turned into spheres (0 = cubes, 1 = spheres), used in the finale. The box
+  // is cut into small squares on each face so there are enough points to bend into a sphere.
+  const morph = { value: 0 };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uMorph = morph;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uMorph;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nobjectNormal = normalize(mix(objectNormal, normalize(position), uMorph));')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = mix(transformed, normalize(position) * 0.5, uMorph);');
+  };
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1, 8, 8, 8), material, count);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   const shadowMaterial = shadowDepthMaterial(() => getSpawnY());
@@ -77,6 +87,15 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     material.needsUpdate = true;
   }
 
+  // Make the cubes glow flat white (1) or show their ordinary shaded colours (0). The colour fades
+  // to black while the glow rises, so the two add up to white and the cubes look like the flat dots
+  // of the logo.
+  function setGlow(amount) {
+    material.color.setScalar(1 - amount);
+    material.emissive.setScalar(amount);
+    material.needsUpdate = false;
+  }
+
   function hide(i) {
     dummy.position.set(0, -100, 0);
     dummy.scale.setScalar(0);
@@ -93,10 +112,10 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   mesh.instanceMatrix.needsUpdate = true;
   mesh.instanceColor.needsUpdate = true;
 
-  function write(i, p, q) {
+  function write(i, p, q, size = 1) {
     dummy.position.set(p.x, p.y, p.z);
     dummy.quaternion.set(q.x, q.y, q.z, q.w);
-    dummy.scale.setScalar(1);
+    dummy.scale.setScalar(size);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   }
@@ -142,6 +161,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   const field = {
     mesh,
     material,
+    morph,
     count,
 
     // Remove every cube, instantly.
@@ -159,6 +179,9 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       steering = null;
       recolouring?.cancel();
       setSolid();
+      setGlow(0); // and back to cubes, shown and shaded, after the finale
+      morph.value = 0;
+      mesh.visible = true;
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     },
@@ -197,7 +220,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       for (let i = 0; i < count; i++) {
         const s = state[i];
         if (s.body) write(i, s.body.position, s.body.quaternion);
-        else if (s.pose) write(i, s.pose.p, s.pose.q);
+        else if (s.pose) write(i, s.pose.p, s.pose.q, s.pose.s);
       }
       mesh.instanceMatrix.needsUpdate = true;
     },
@@ -246,9 +269,60 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
           spawned: true,
           p: { x: p.x, y: p.y, z: p.z },
           q: { x: q.x, y: q.y, z: q.z, w: q.w },
+          s: source.s ?? 1,
           colour: `#${colour.getHexString()}`,
         };
       });
+    },
+
+    // Fly every cube to its target `targets[i]` ({ x, y, z, scale }), turning it to face the camera,
+    // and change how the cubes look: `morph` (0 = cubes, 1 = spheres) and `glow` (0 = shaded
+    // colours, 1 = flat white) are set at the end, moving gradually on the way. Cubes with scale 0
+    // shrink away. Used to fly the cubes into the dots of the logo and back.
+    flyTo(targets, { seconds, morph: morphTo = 0, glow = 0, stagger = 0.25, scale = 1 }) {
+      const fromQ = new THREE.Quaternion();
+      const identity = new THREE.Quaternion();
+      const flights = [];
+      const morphFrom = morph.value;
+      const glowFrom = material.emissive.r;
+      const random = mulberry32(ARENA.spawnSeed + 31);
+      state.forEach((s, i) => {
+        const body = s.body;
+        const from = body
+          ? { p: { x: body.position.x, y: body.position.y, z: body.position.z }, q: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w }, s: 1 }
+          : s.pose && { p: { ...s.pose.p }, q: { ...s.pose.q }, s: s.pose.s ?? 1 };
+        if (!from || !targets[i]) return;
+        if (body) physics.removeCube(body);
+        s.body = null;
+        s.pose = { p: { ...from.p }, q: { ...from.q }, s: from.s };
+        flights.push({ i, from, to: targets[i], delay: random() * stagger * seconds });
+      });
+      return tween({
+        duration: seconds,
+        easing: ease.linear,
+        onUpdate: (progress) => {
+          const time = progress * seconds;
+          const all = ease.inOutCubic(progress);
+          morph.value = morphFrom + (morphTo - morphFrom) * all;
+          setGlow(glowFrom + (glow - glowFrom) * all);
+          for (const { i, from, to, delay } of flights) {
+            const e = ease.inOutCubic(Math.min(1, Math.max(0, (time - delay) / (seconds - stagger * seconds))));
+            const pose = state[i].pose;
+            pose.p.x = from.p.x + (to.x - from.p.x) * e;
+            pose.p.y = from.p.y + (to.y - from.p.y) * e;
+            pose.p.z = from.p.z + ((to.z ?? from.p.z) - from.p.z) * e;
+            fromQ.set(from.q.x, from.q.y, from.q.z, from.q.w).slerp(identity, e);
+            pose.q.x = fromQ.x; pose.q.y = fromQ.y; pose.q.z = fromQ.z; pose.q.w = fromQ.w;
+            pose.s = from.s + ((to.scale ?? scale) - from.s) * e;
+          }
+          field.sync();
+        },
+      }).finished.then(() => undefined);
+    },
+
+    // Show or hide all the cubes at once (the logo takes over from them in the finale).
+    setVisible(visible) {
+      mesh.visible = visible;
     },
 
     // Fade every cube to the colour `colourOf(i)` returns and to `alpha` (1 = solid, less =

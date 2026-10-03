@@ -200,7 +200,7 @@ Generator tasks (M0):
 | Categorise → Sort | Cubes are pulled to their heap spots and pile up, 3 s, plus up to 7 s for stragglers (10 s at the most) | Ease to the Categorise snapshot, 1.2 s |
 | Sort → Arrange | Each heap lifts in turn and its cubes fly into their sheet of the cube, 3.5 s in all | Ease to the Sort snapshot, 1.5 s |
 | Arrange → Insight 1 → 2 → 3 | Cube rotation plus camera change, 1.5 s each | Same, reversed |
-| Insight 3 → Finale | Background eases from white to black while the cubes fly to the logo dots (3 s), then the lock-up fades in (1 s) | Same, reversed |
+| Insight 3 → Finale | Background eases from white to black while the cubes fly to the logo dots (3 s), then the lock-up fades in (1 s) | Lock-up fades out (0.5 s), cubes fly back and the page goes white (2.5 s) |
 
 ### 6.3 Kiosk mode
 
@@ -401,7 +401,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M3 (built) | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 (built) | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
 | M5 (built) | **Insights** ×3: turns, dolly zoom to a flat grid, see-through cubes, key | Each face shows its claim at a glance. |
-| M6 | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
+| M6 (built) | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | M7 | Kiosk mode, reduced motion, no-WebGL fallback, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
 | M8 | Polish, performance, README, NOTICE, GitHub Pages | Runs on the latest Chrome, Edge, Firefox and Safari. Steady 60 fps on an integrated-GPU laptop. |
 | Stretch | Sound, mobile and touch, tooltips | – |
@@ -424,6 +424,17 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - The release rate ramps up over the first second and down over the last (`DURATIONS.dropRamp`, 1 s), so the stream starts and tails off like a pour. The release lasts 2 s (`DURATIONS.drop`), so the two ramps meet and the flow is a triangle that peaks at 1 s at about 164 cubes a second. The default cube has released 1, 7, 20, 46 and 82 cubes by 0.1, 0.3, 0.5, 0.75 and 1 s, and 159 by 1.75 s. A drop longer than twice the ramp leaves a steady flow between the ramps; a ramp longer than half the drop is cut to half. (An earlier version dropped the cubes in 1 s with 0.5 s ramps, which made the stream wider because the lanes are sized for the peak rate.) The lanes are sized for the peak rate, so no cube starts inside another.
 
 - The pour varies at random (`STREAM.variation`, 0.5): the release rate and the width of the stream each wander by up to 50% either way, on slow cycles of roughly half a second to two seconds, on top of the ramps. The width is the number of lanes in use, taken from the inside of the spiral outward, so the stream's area really does change by up to 50%. The release time of each cube is read from the tabulated, randomised flow. When the stream is narrow and the flow is high, a cube waits for a free lane (so no cube is ever released inside another), which flattens the peaks a little and makes the pour end up to about 0.6 s after its planned time. Up to 50% more lanes than the plain pour need are available, so the widest the stream gets is about 5 units from the middle for 164 cubes. Everything is seeded, so a given data file always pours the same way. For the default cube, cubes released in successive 0.2 s windows run 4, 11, 12, 19, 41, 23, 21, 21, 9, 3, using 4 to 14 lanes.
+
+### M6 as built
+
+- **The dots.** `scripts/extract-logo-dots.mjs` (using `pngjs`, which is pure JavaScript) finds the 26 dots of the symbol in the white lock-up image from the transparent pixels and writes `src/logoDots.js`: 6 inner, 8 middle and 12 outer, radii about 17, 31 and 41 px in the 2506 x 868 px image. It reads transparency, not colour, so the black lock-up gives the same dots. The image used on the page is `assets/UKCEH_Logo_Tagline_Stacked_White_Data.png`.
+- **Placing the logo.** The lock-up is centred on the stage at up to 62% of its size, and the world position and size of each dot are worked out from the stage size and the scale of the face view (the camera is still the one from the last Insight). The lock-up is an HTML image laid exactly over the stage; in the browser every disc was within 0.001 pixels of its dot in position and size. The lock-up and the discs move together if the window is resized.
+- **Which cube becomes which dot.** The cheapest pairing is found with the Hungarian algorithm (a test checks it against brute force), so the 26 flights are as short as they can be in total. The other 138 cubes fly to the nearest dot and shrink to nothing. If a cube count is lower than 26, each cube takes its own dot and the spare dots appear only with the lock-up.
+- **The flight (3 s).** The cubes fly across, turning square to the camera, while the page goes from white to black, the frame fades out and the cubes become solid. They bend from cubes into spheres: each face of the box is cut into 8 x 8 squares so there are enough points, and the shader moves every point towards the sphere by an amount that rises from 0 to 1. They also turn white: the colour fades to black while a white glow rises, so the cubes become flat white discs like the logo.
+- **The lock-up (1 s).** It fades in over the discs and then the cubes are hidden (not removed, so Back still has them).
+- **Back.** The cubes reappear, the lock-up fades out in 0.5 s, and over 2.5 s the cubes unbend, lose the glow, grow and fly back to their cells while the page goes white; the box and the two Insight titles return.
+- **Restart** fades the lock-up out in 0.6 s, clears the cubes, puts the camera back on the floor and brings the black opening screen and its network back. After a Restart nothing from the first run is left over (checked: no cubes, no lock-up, black page, network at full strength).
+- Taking a full run in the browser from the first Next to Restart gave no console errors.
 
 ### M4 as built
 

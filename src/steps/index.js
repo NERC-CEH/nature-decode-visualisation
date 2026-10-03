@@ -9,6 +9,7 @@ import { categoriseStep } from './categorise.js';
 import { sortStep } from './sort.js';
 import { arrangeStep } from './arrange.js';
 import { insight1Step, insight2Step, insight3Step } from './insights.js';
+import { finaleStep } from './finale.js';
 
 const PLACEHOLDER_PAUSE = 0.4; // seconds
 
@@ -20,6 +21,7 @@ const built = {
   insight1: insight1Step,
   insight2: insight2Step,
   insight3: insight3Step,
+  finale: finaleStep,
 };
 
 export function buildSteps(configSteps) {

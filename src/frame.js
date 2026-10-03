@@ -97,6 +97,18 @@ export function createFrame({ parent, staticParent = null, edge, centreY, makeLa
       });
       return running.finished.then(() => undefined);
     },
+    // Fade only the box, leaving the arrow and titles as they are.
+    fadeBoxTo(target, seconds) {
+      running?.cancel();
+      const from = amount;
+      if (from === target) return Promise.resolve();
+      running = tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (p) => { amount = from + (target - from) * p; apply(); },
+      });
+      return running.finished.then(() => undefined);
+    },
     // Fade only the arrow and the three axis titles, leaving the box. The face views use this.
     fadeTitlesTo(target, seconds) {
       titleRunning?.cancel();
