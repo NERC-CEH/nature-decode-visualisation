@@ -7,6 +7,7 @@ import { createTheme } from './theme.js';
 import { createScene } from './scene.js';
 import { createPhysics } from './physics.js';
 import { createCubeField } from './cubes.js';
+import { createNetwork } from './network.js';
 import { repel } from './repulsion.js';
 import { createController } from './controller.js';
 import { buildSteps } from './steps/index.js';
@@ -47,15 +48,22 @@ const field = scene
   ? createCubeField({ scene: scene.scene, physics, cubes: cube.cubes, arena, getSpawnY: () => scene.spawnY })
   : null;
 
+const network = scene ? createNetwork({ scene: scene.scene, camera: scene.camera }) : null;
+
 const ctx = {
   cube,
   scene,
   physics,
   field,
+  network,
   repel: false, // set from the current step
   setTheme: (name) => theme.animateTo(name, DURATIONS.theme),
   capture: () => field?.capture() ?? [],
-  reset: () => Promise.all([field?.liftAway(DURATIONS.lift), theme.animateTo(steps[0].theme, DURATIONS.theme)]),
+  reset: () => Promise.all([
+    field?.liftAway(DURATIONS.lift),
+    theme.animateTo(steps[0].theme, DURATIONS.theme),
+    network?.fadeTo(1, DURATIONS.theme),
+  ]),
 };
 
 const controller = createController({
@@ -76,6 +84,7 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   field?.tick(dt);
+  network?.update(dt);
   const point = ctx.repel && scene?.floorPoint();
   if (point) repel(physics.bodies, point, dt);
   physics.step(dt);

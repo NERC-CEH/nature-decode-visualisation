@@ -69,6 +69,7 @@ src/
   labels.js             axis titles and time arrow
   tween.js              tween and easing helpers
   theme.js              light/dark page theme, eased as one value
+  network.js            the intro's background network of wireframe cubes
   steps/                one module per step (data, categorise, sort, arrange, insight, finale),
                         each exporting enter(), exit() and reverse()
   ui.js                 caption bar, buttons, progress, live region
@@ -213,7 +214,7 @@ Generator tasks (M0):
 
 | # | Step | Forward | Interaction |
 |---|---|---|---|
-| 0 | Intro | Title and line fade in on black. | Next. |
+| 0 | Intro | Title and line fade in on black, over a slowly drifting network of small wireframe cubes joined by thin lines (7.8). | Next. |
 | 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 1 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
 | 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. | Cursor repels cubes. |
 | 3 | **Sort** | Cubes are steered to one spot per species, in a row across the floor in display order, and tumble into heaps there. No labels. | Cursor repels cubes. |
@@ -279,6 +280,15 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 - The lock-up image then fades in over the discs. The symbol in the image and the discs coincide, so the hand-over cannot be seen. The discs are removed after the fade.
 - The tagline is also present as text in the live region for screen readers.
 - Reverse: the image fades out, the discs reappear, and the fliers return to the cube while the faded cubes return.
+
+### 7.8 Intro network
+
+- About 80 small wireframe cubes, each joined by thin white lines to its two nearest neighbours (nearest as seen on screen, so the lines are mostly short). Cubes are 0.5 to 1 unit across at a depth of 45 units, at 50% opacity.
+- The network hangs in the camera's own space, so it fills the screen behind the title at any window shape and does not move with the floor camera.
+- Everything moves slowly: each cube sways by about 3.5% of the view on its own cycle of 30 s or so and turns slowly on its axes, and the whole cloud rocks gently back and forth, which gives it depth. The speed is a few pixels per second.
+- Layout, sizes and cycles are seeded, so the network looks the same each time the page loads.
+- On Next the network fades out over the same 1 s, and with the same easing, as the page eases to white. On Back to the intro it fades back in. It is not shown on the finale. It does no work while hidden.
+- Reduced motion (M7): the network stays but stops moving.
 
 ## 8. Narrative copy
 
@@ -400,6 +410,8 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - Repulsion was tuned in a simulation (a resting cube next to a stationary cursor is driven out to the edge of the cursor's reach, about 6 units; a quick sweep nudges it 1 to 5 units). Final values are set by eye at review.
 - `?debug` on the page address exposes the app as `__dataCube` in the browser console, for testing.
 - Verified in Edge from `file://`: 164 cubes released, all settle inside the walls; repulsion pushes only nearby cubes; Back lifts everything away and the cubes drop again on Next. Headless software rendering ran at 19 fps, so the 60 fps target still needs checking on a real GPU.
+
+- The intro network is built (7.8): `src/network.js`, tuned in `NETWORK` in `config.js`.
 
 ### M0 as built
 

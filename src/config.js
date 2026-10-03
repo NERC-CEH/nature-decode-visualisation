@@ -62,6 +62,22 @@ export const STREAM = {
   drift: 2, // random sideways speed at release, so the pile spreads
 };
 
+// The network of wireframe cubes behind the title on the opening screen. It hangs this many
+// units in front of the camera. Sway is how far each cube drifts (as a share of the view), cycle
+// is the length in seconds of a slow sway, and turn is how far the whole cloud rocks, in radians.
+export const NETWORK = {
+  nodes: 80,
+  neighbours: 2, // each cube is joined to this many of its nearest cubes
+  depth: 45,
+  size: [0.5, 1.0], // cube edge, in units at that depth
+  opacity: 0.5,
+  colour: '#FFFFFF',
+  sway: 0.035,
+  cycle: 30,
+  turn: 0.25,
+  seed: 7,
+};
+
 // Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.
 export const CAMERA = {
   elevation: 10,
