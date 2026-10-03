@@ -46,10 +46,14 @@ export const DURATIONS = {
   lift: 1.2, // cubes rise out of view on Back
   categorise: 2.0, // every cube has taken its species colour within this time, each at its own random moment
   categoriseBack: 1.0, // and on Back, the colours drain away within this time
+  explode: 0.5, // Sort begins with the cubes thrown up and out for this long...
+  freeze: 0.5, // ...then hanging frozen in mid air for this long, before the pull begins
   sort: 3.0, // the cubes are pulled into their heaps for this long...
-  sortSettle: 0.5, // ...and the step is ready this long after the pull ends
+  sortSettle: 0.5, // ...and the step is ready this long after the pull ends,
+  sortReady: 4.5, // or this long after the pull starts if some cubes are still on their way (the pull carries on)
   sortBack: 1.2, // on Back the cubes ease back to where they were
   look: 1.0, // cubes change between solid and see-through, and between colours and grey
+  finaleFade: 0.9, // the cubes that are not needed fade away this long before the others fly to the dots
   finale: 3.0, // the cubes fly to the dots of the logo, and the page fades to black, over this time...
   logoFade: 1.0, // ...then the logo lock-up fades in over the dots in this time
   finaleBack: 2.5, // on Back the cubes fly back to the cube
@@ -103,6 +107,17 @@ export const NETWORK = {
   maxPush: 14,
 };
 
+// The explosion that begins the Sort step, to pull the cubes apart and off the floor so none are
+// stuck in the pile. Each cube is thrown away from the middle of the pile at `outward` units/s
+// (varying by up to half either way) and up at `up` units/s; cubes low in the pile get up to
+// `lowBonus` more upward speed, as they have the most weight on them. `spin` is the tumble.
+export const EXPLODE = {
+  outward: 16,
+  up: 17,
+  lowBonus: 10,
+  spin: 8,
+};
+
 // The Sort step pulls every cube across the floor towards the heap for its species. The pull is
 // an acceleration in units/s^2 that never drops below `base` (far more than the floor's friction,
 // so cubes shove through and keep sliding until the cubes ahead stop them, which builds a heap
@@ -146,6 +161,23 @@ export const CUBE = {
   tilt: 0.05,
 };
 
+// The tag lines and labels that point at cubes (see callout.js). A step lists them in `callout`, each
+// with a `target` and `text`; they appear one after another. The first line starts `delay` seconds after
+// the caption has faded in, grows out over `grow` seconds at `angle` degrees above horizontal, to
+// `length` pixels from the cube (starting `gap` pixels away); then the label fades in over
+// `labelFade`. Everything fades out within `leave` seconds when the step changes.
+export const CALLOUT = {
+  delay: 0,
+  grow: 0.8,
+  box: 0.8, // a rectangle round a region traces itself in this long, before the line comes off it
+  labelFade: 0.6,
+  leave: 0.2,
+  length: 120,
+  gap: 34,
+  angle: 40,
+  labelWidth: 260,
+};
+
 // The logo in the finale: the lock-up image fills this share of the stage, as far as its shape
 // allows. The cubes become the dots of the symbol and are drawn flat white, as in the logo.
 export const LOGO = {
@@ -155,16 +187,18 @@ export const LOGO = {
 // The face views (the Insights): the camera looks straight at a face of the cube through a view
 // this many degrees wide (narrow, so that perspective all but disappears), with `margin` times the
 // room the face needs for itself and its two axis titles. Cubes are drawn see-through there: a cube
-// is `alpha` opaque (`neutralAlpha` when species have been put together), so the more cubes lie
+// is `alpha` opaque (computed from the data when species have been put together, see steps/insights.js), so the more cubes lie
 // behind each other along the line of sight, the darker the cell. `neutral` is the grey they take
 // when the colours mean nothing.
 export const FACE = {
   fov: 3,
   margin: 1.45,
   alpha: 0.6,
-  neutralAlpha: 0.4,
-  neutral: '#333333',
-  turn: 1.6, // seconds to turn from one face to the next
+  neutral: '#000000', // black cubes, as their tone is the count, so the alpha comes from the data (steps/insights.js)
+  densityFloor: 0.04, // the share of light that gets through the deepest line of cubes
+  turn: 2.5, // seconds to turn from one face to the next
+  pullBack: 0.6, // seconds to pull back before the cube turns...
+  pullBackShare: 0.45, // ...this share of the way from the face view towards the wide cube view, which brings back some perspective so the turn reads as 3D
 };
 
 // Dragging the cube: radians turned per pixel dragged, the furthest it can tilt, and the stiffness
@@ -172,7 +206,7 @@ export const FACE = {
 export const ROTATE = {
   sensitivity: 0.008,
   maxPitch: 1.8,
-  spring: 9,
+  spring: 3.5,
 };
 
 // Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.
@@ -192,6 +226,8 @@ export const REPEL = {
 
 export const SIMULATED_NOTE = 'Simulated data.';
 export const TAGLINE = 'Our planet. Decoded.';
+export const TAGLINE_LONG = 'Decoding nature reveals its stories.';
+export const CREDIT = { text: 'Design and implementation by Tom August', url: 'https://www.ceh.ac.uk/staff/tom-august' };
 
 // One entry per step, in order. `theme` is the page colour for that step.
 // `repel` marks steps where the cursor pushes the cubes, and `rotate` those where the cube can be dragged round, and `note` replaces the footnote. `canvasLabel` describes the 3D scene
@@ -207,6 +243,8 @@ export const STEPS = [
   {
     id: 'data',
     title: 'Data',
+    callout: [{ target: 'topRight', text: 'Each black cube represents a wildlife observation contributed by a member of the public.' }],
+    captionWhenReady: true, // the caption appears once the last cube has been released (plus the settle time)
     text: 'Every record of wildlife is a data point. Smartphone apps and surveys now collect them in large numbers. On their own, they are scattered and hard to read.',
     theme: 'light',
     repel: true,
@@ -215,6 +253,7 @@ export const STEPS = [
   {
     id: 'categorise',
     title: 'Categorise',
+    callout: [{ target: 'topRight', text: 'Each wildlife observation has attributes; for example these observations have been coloured according to which species was seen.' }],
     text: 'Each record names a species. We give each species its own colour.',
     theme: 'light',
     repel: true,
@@ -223,6 +262,12 @@ export const STEPS = [
   {
     id: 'sort',
     title: 'Sort',
+    // the second label appears once the first has faded in; both wait until the heaps have formed
+    callout: [
+      { target: 'backLeftHeap', text: 'Some species have lots of observations.' },
+      { target: 'backRightHeap', text: 'Some species have few observations.' },
+    ],
+    calloutWhenReady: true,
     text: 'We group the records by species. Some species have many records. Others have few.',
     theme: 'light',
     repel: true,
@@ -234,6 +279,14 @@ export const STEPS = [
     rotate: true,
     text: 'We place each record in a cube with three axes: species, location and time. Each species is one sheet. A data cube is a stack of spreadsheets, one on top of another.',
     theme: 'light',
+    callout: [
+      { target: 'cubeTopRight', text: 'We can put all our wildlife observations into a data cube.' },
+      // `reveal` fades in an axis title with its label; `delay` is the wait after the label before it
+      { target: 'leftmost', text: "Each layer going up is one species' data.", reveal: 'species', delay: 1 },
+      { target: 'rightmostBack', text: 'Each layer going back is a different location.', reveal: 'location', delay: 1 },
+      { target: 'lowest', text: 'Each slice going left to right is a different year.', reveal: 'time', delay: 1 },
+    ],
+    calloutWhenReady: true,
     canvasLabel: 'The cubes arrange into a three-dimensional data cube with axes for species, location and time. Drag to rotate it.',
   },
   {
@@ -244,6 +297,12 @@ export const STEPS = [
     text: 'Species by location. Generalist species occur in many locations. Specialist species occur in few, because they depend on particular habitats.',
     theme: 'light',
     insight: 1,
+    // a rectangle round the rows, then a line off the left or right side of it, then the label
+    callout: [
+      { target: 'specialists', side: 'left', text: 'Some species are found in few locations - these are called specialists.' },
+      { target: 'generalists', side: 'right', text: 'Some species are found in many locations - these are called generalists.', delay: 1 },
+    ],
+    calloutWhenReady: true,
     canvasLabel: 'The data cube seen from the side, showing species against location.',
     summary: 'Generalist species have records in many locations. The two specialist species have records in only one habitat.',
   },
@@ -255,6 +314,12 @@ export const STEPS = [
     text: 'Location by time. Records grow over time across locations, as more people record wildlife with smartphone apps.',
     theme: 'light',
     insight: 2,
+    // lines off the left and right of the cube's box (`outline: false`: no rectangle), part of the way down
+    callout: [
+      { target: 'cubeBox', side: 'left', outline: false, anchor: 0.15, text: 'In the past, few people submitted observations of wildlife.' },
+      { target: 'cubeBox', side: 'right', outline: false, anchor: 0.15, text: 'In recent years we have received more data as more people get involved in wildlife recording.', delay: 1 },
+    ],
+    calloutWhenReady: true,
     canvasLabel: 'The data cube seen from above, showing location against time.',
     summary: 'The number of records rises from the earliest time to the latest, in locations across the cube.',
   },
@@ -266,13 +331,29 @@ export const STEPS = [
     text: 'Species by time. Overall recording rises, yet specialist records fall. That pattern points to a decline.',
     theme: 'light',
     insight: 3,
+    // a rectangle round each pair of rows, then a line off its side, then the label
+    callout: [
+      { target: 'generalists', side: 'right', text: 'Many generalists are adapting to our changing world.' },
+      { target: 'specialists', side: 'left', text: 'Specialists find it harder to adapt and many are disappearing over time.', delay: 1 },
+    ],
+    calloutWhenReady: true,
     canvasLabel: 'The data cube seen from the front, showing species against time.',
     summary: 'Records rise overall, but the two specialist species have no records in the last third of the time axis.',
+  },
+  {
+    id: 'conclusion',
+    title: TAGLINE_LONG,
+    text: '',
+    statement: true, // the title alone, large and centred, with no caption
+    rotate: true,
+    theme: 'light',
+    canvasLabel: 'The finished data cube, seen from the front and side. Decoding nature reveals its stories. Drag to rotate it.',
   },
   {
     id: 'finale',
     title: 'UKCEH',
     text: TAGLINE,
+    credit: true, // the credit link replaces the title and caption
     theme: 'dark',
     canvasLabel: 'The cubes form the dots of the UKCEH logo. Our planet. Decoded.',
   },

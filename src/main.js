@@ -1,6 +1,6 @@
 // Boot: load the data, build the scene and controller, wire up the UI.
 
-import { STEPS, DURATIONS, speciesColour } from './config.js';
+import { STEPS, DURATIONS, CALLOUT, speciesColour } from './config.js';
 import { readGlobalCube } from './data.js';
 import { arenaSize, streamRadius } from './arena.js';
 import { createTheme } from './theme.js';
@@ -18,6 +18,7 @@ import { heapSpots } from './steering.js';
 import { createController } from './controller.js';
 import { buildSteps } from './steps/index.js';
 import { createUi } from './ui.js';
+import { createCallout, pickTopRight } from './callout.js';
 
 const steps = buildSteps(STEPS);
 const ui = createUi({
@@ -25,6 +26,11 @@ const ui = createUi({
   onNext: () => controller.next(),
   onBack: () => controller.back(),
   onRestart: () => controller.restart(),
+  onCaptionShown: (step) => {
+    if (!step.callout) return;
+    if (step.calloutWhenReady && controller.state.busy) pendingCallouts = step;
+    else startCallouts(step);
+  },
 });
 
 let cube;
@@ -36,7 +42,7 @@ try {
   throw error;
 }
 
-const scene = createScene(document.getElementById('canvas-wrap'));
+const scene = createScene(document.getElementById('canvas-wrap'), document.querySelector('.stage'));
 if (!scene) ui.showNoWebGL();
 
 // One theme value drives the CSS variables and the 3D clear colour together.
@@ -116,21 +122,141 @@ const ctx = {
   },
 };
 
+// Where something a callout can point at is on the stage. Numbers below the cube count are cubes;
+// the numbers after them are the eight corners of the frame round the data cube.
+const corners = [-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => ({
+  x: (x * cubeBox.edge) / 2,
+  y: cubeBox.centreY + (y * cubeBox.edge) / 2,
+  z: (z * cubeBox.edge) / 2,
+}))));
+const locate = (i) => {
+  if (i >= cube.cubes.length) return scene.toStage(corners[i - cube.cubes.length]);
+  const p = field?.positionOf(i);
+  return p ? scene.toStage(p) : null;
+};
+// Each tag line and label is its own callout; a step's list plays one after another.
+const callouts = scene && field
+  ? [0, 1, 2, 3].map(() => createCallout({
+    layer: document.getElementById('callouts'),
+    locate,
+    pick: () => -1,
+    obstacles: () => cube.cubes.map((_, i) => locate(i)),
+  }))
+  : [];
+let pendingCallouts = null;
+
+// The cubes of one species' heap (the back left or back right one).
+function heapCubes(target) {
+  const spots = heapSpots(arena, cube.displayOrder);
+  const species = spots.map((spot, id) => ({ ...spot, id })).filter((spot) => spot.x !== undefined);
+  const zs = species.map((spot) => spot.z).sort((p, q) => p - q);
+  const back = species.filter((spot) => spot.z <= zs[Math.floor((zs.length - 1) / 2)]);
+  const chosen = back.reduce((best, spot) => ((target === 'backLeftHeap' ? spot.x < best.x : spot.x > best.x) ? spot : best));
+  return new Set(cube.cubes.map((c, i) => (c.species === chosen.id ? i : -1)).filter((i) => i >= 0));
+}
+
+// The index of the cube (or frame corner) a callout should point at, not one already used.
+function chooseTarget(target, used) {
+  const all = cube.cubes.map((_, i) => (used.has(i) ? null : locate(i)));
+  const best = (points, score) => points.reduce((top, p, i) => (p && (top < 0 || score(p) > score(points[top])) ? i : top), -1);
+  if (target === 'cubeTopRight') {
+    return cube.cubes.length + best(corners.map((_, k) => locate(cube.cubes.length + k)), (p) => p.x - p.y);
+  }
+  if (target === 'backLeftHeap' || target === 'backRightHeap') {
+    const members = heapCubes(target);
+    return pickTopRight(all.map((p, i) => (members.has(i) ? p : null)));
+  }
+  if (target === 'rightmost') return best(all, (p) => p.x);
+  if (target === 'leftmost') return best(all, (p) => -p.x);
+  if (target === 'lowest') return best(all, (p) => p.y);
+  if (target === 'rightmostBack') {
+    // of the quarter of the cubes furthest from the camera, the one furthest right
+    const depths = all.filter(Boolean).map((p) => p.depth).sort((p, q) => p - q);
+    const limit = depths[Math.floor(depths.length * 0.75)];
+    return best(all.map((p) => (p && p.depth >= limit ? p : null)), (p) => p.x);
+  }
+  return pickTopRight(all);
+}
+
+// The rectangle round the cells of the specialist species (the top two rows) or the generalists
+// (the bottom two), in stage pixels, or null if they cannot be placed.
+function rowsRegion(target, anchor) {
+  if (target === 'cubeBox') {
+    const points = corners.map((_, k) => locate(cube.cubes.length + k)).filter(Boolean);
+    if (!points.length) return null;
+    return {
+      left: Math.min(...points.map((p) => p.x)),
+      right: Math.max(...points.map((p) => p.x)),
+      top: Math.min(...points.map((p) => p.y)),
+      bottom: Math.max(...points.map((p) => p.y)),
+      anchor,
+    };
+  }
+  const order = cube.displayOrder;
+  const wanted = new Set(target === 'specialists' ? order.slice(-2) : order.slice(0, 2));
+  const members = cube.cubes.map((c, i) => (wanted.has(c.species) ? i : -1)).filter((i) => i >= 0);
+  const points = members.map((i) => locate(i)).filter(Boolean);
+  if (!points.length) return null;
+  const first = field.positionOf(members[0]);
+  const a = scene.toStage(first);
+  const b = scene.toStage({ x: first.x, y: first.y + 1, z: first.z });
+  const pad = 0.5 * Math.hypot(b.x - a.x, b.y - a.y) + 6;
+  return {
+    left: Math.min(...points.map((p) => p.x)) - pad,
+    right: Math.max(...points.map((p) => p.x)) + pad,
+    top: Math.min(...points.map((p) => p.y)) - pad,
+    bottom: Math.max(...points.map((p) => p.y)) + pad,
+  };
+}
+
+function startCallouts(step) {
+  const entries = step.callout;
+  const used = new Set();
+  const play = (n) => {
+    if (n >= entries.length || !callouts[n]) return;
+    const { target, text, reveal, delay, side, outline, anchor } = entries[n];
+    callouts[n].schedule(text, {
+      ...(side ? { region: () => rowsRegion(target, anchor), side, outline } : {}),
+      delay: n === 0 ? undefined : (delay ?? 0),
+      onLabel: () => { if (reveal) frame?.showAxis(reveal, CALLOUT.labelFade); },
+      pick: () => {
+        const index = chooseTarget(target, used);
+        used.add(index);
+        return index;
+      },
+      onShown: () => play(n + 1),
+    });
+  };
+  play(0);
+}
+
 const controller = createController({
   steps,
   ctx,
   onChange: (state) => {
     ctx.repel = Boolean(state.step.repel);
     if (rotation) rotation.enabled = Boolean(state.step.rotate);
+    if (state.index !== lastIndex) {
+      callouts.forEach((c) => c.hide());
+      pendingCallouts = null;
+      lastIndex = state.index;
+    }
+    if (!state.busy && pendingCallouts) {
+      const step = pendingCallouts;
+      pendingCallouts = null;
+      startCallouts(step);
+    }
     ui.render(state);
   },
 });
+let lastIndex = controller.state.index;
 ui.render(controller.state);
 
 // Everything that changes from one frame to the next.
 function update(dt) {
   field?.tick(dt);
   rotation?.update(dt);
+  callouts.forEach((c) => c.update(dt));
   network?.update(dt, scene?.pointerNdc());
   const point = ctx.repel && scene?.floorPoint();
   if (point) repel(physics.bodies, point, dt);

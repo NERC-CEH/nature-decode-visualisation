@@ -9,6 +9,26 @@
 
 import { CUBE, DURATIONS, FACE, speciesColour } from '../config.js';
 import { wait } from '../tween.js';
+import { arrangement } from '../layout.js';
+
+// The most cubes in any one line of sight when the cube is seen from above (along the species axis):
+// the most records in one cell of time and location.
+export function deepestStack(cube) {
+  const counts = new Map();
+  for (const cell of arrangement(cube.cubes, cube.displayOrder, cube.size)) {
+    const key = `${cell.x.toFixed(3)},${cell.z.toFixed(3)}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Math.max(1, ...counts.values());
+}
+
+// How opaque each black cube is in the top view. Each cube in a line of sight lets through the same share
+// of the light, so n cubes let through (1 - alpha)^n. It is chosen so the deepest stack lets through only
+// FACE.densityFloor, which spreads the tones from a single cube (light grey) to the deepest stack (black)
+// instead of squeezing the busiest cells together.
+export function densityAlpha(cube) {
+  return 1 - FACE.densityFloor ** (1 / deepestStack(cube));
+}
 
 export const FACES = {
   insight1: { yaw: Math.PI / 2, pitch: 0, neutral: false, horizontal: 'Location', vertical: 'Species' },
@@ -17,30 +37,43 @@ export const FACES = {
 };
 
 // Turn to show `face`, from the arranged cube or from another face.
-async function showFace(ctx, face) {
+export async function showFace(ctx, face) {
   const { cube, field, scene, frame, rotation } = ctx;
-  rotation.setTarget({ yaw: face.yaw, pitch: face.pitch });
   const colourOf = face.neutral ? () => FACE.neutral : (i) => speciesColour(cube.cubes[i].species);
+  // Phase 1: pull back slightly to make the rotation visible
   await Promise.all([
-    scene?.setView('face', FACE.turn),
-    rotation.arrive(FACE.turn + 2),
-    field.blendTo(colourOf, face.neutral ? FACE.neutralAlpha : FACE.alpha, DURATIONS.look),
-    frame?.fadeTitlesTo(0, 0.4),
-    wait(0.5).then(() => frame?.showFaceTitles(face.horizontal, face.vertical, 0.5)),
+    scene?.setView('cube', FACE.pullBack, FACE.pullBackShare),
+    frame?.fadeTitlesTo(0, 0.2),
   ]);
+  // Phase 2: rotate the cube while zooming in and blending colours
+  rotation.setTarget({ yaw: face.yaw, pitch: face.pitch });
+  await Promise.all([
+    scene?.setView('face', FACE.turn - FACE.pullBack),
+    rotation.arrive(FACE.turn),
+    field.blendTo(colourOf, face.neutral ? densityAlpha(cube) : FACE.alpha, DURATIONS.look),
+  ]);
+  // Phase 3: show the titles
+  await frame?.showFaceTitles(face.horizontal, face.vertical, 0.5);
 }
 
 // Back to the arranged cube.
-async function backToCube(ctx) {
+// With `restoreTitles` false the axis titles and arrow stay hidden (the conclusion).
+export async function backToCube(ctx, { restoreTitles = true } = {}) {
   const { cube, field, scene, frame, rotation } = ctx;
+  // Phase 1: hide titles and pull back
+  await Promise.all([
+    frame?.hideFaceTitles(0.2),
+    scene?.setView('cube', FACE.pullBack, FACE.pullBackShare),
+  ]);
+  // Phase 2: rotate back while zooming in and restoring colours
   rotation.setTarget({ yaw: CUBE.yaw, pitch: CUBE.tilt });
   await Promise.all([
-    scene?.setView('cube', FACE.turn),
-    rotation.arrive(FACE.turn + 2),
+    scene?.setView('cube', FACE.turn - FACE.pullBack),
+    rotation.arrive(FACE.turn),
     field.blendTo((i) => speciesColour(cube.cubes[i].species), 1, DURATIONS.look),
-    frame?.hideFaceTitles(0.3),
-    wait(0.8).then(() => frame?.fadeTitlesTo(1, 0.6)),
   ]);
+  // Phase 3: restore the frame titles
+  if (restoreTitles) await frame?.fadeTitlesTo(1, 0.4);
 }
 
 export const insight1Step = {

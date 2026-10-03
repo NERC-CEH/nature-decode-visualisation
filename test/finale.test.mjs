@@ -8,10 +8,11 @@ import { createCubeField } from '../src/cubes.js';
 import { arrangement } from '../src/layout.js';
 import { assign, createLogo, finaleTargets, logoLayout } from '../src/finale.js';
 import { finaleStep } from '../src/steps/finale.js';
-import { FACES } from '../src/steps/insights.js';
+import { CUBE } from '../src/config.js';
 import logoDots from '../src/logoDots.js';
 import { LOGO } from '../src/config.js';
 import { loadCube } from '../src/data.js';
+import { mulberry32 } from '../src/random.js';
 
 const cube = loadCube(JSON.parse(readFileSync('data/data-cube.json', 'utf8')));
 const arena = arenaSize(cube.cubes.length);
@@ -99,32 +100,38 @@ test('assign finds the cheapest pairing, as brute force does', () => {
   }
 });
 
-test('26 cubes become the dots and every other cube flies to a dot and shrinks away', () => {
+test('26 cubes are chosen to become the dots and every other cube is removed', () => {
   const layout = logoLayout({ stage, image: logoDots.image, dots: logoDots.dots, unitsPerPixel: 0.02 });
   const cells = arrangement(cube.cubes, cube.displayOrder, cube.size);
-  const targets = finaleTargets(cells.map((c) => ({ x: c.x, y: c.y })), layout);
+  const targets = finaleTargets(cells.map((c) => ({ x: c.x, y: c.y })), layout, mulberry32(1));
   assert.equal(targets.length, cube.cubes.length);
-  const becoming = targets.filter((t) => t.scale > 0);
+  const becoming = targets.filter((t) => !t.removed);
   assert.equal(becoming.length, 26);
   assert.equal(new Set(becoming.map((t) => t.dot)).size, 26, 'one cube for each dot');
-  assert.ok(targets.filter((t) => t.scale === 0).length === cube.cubes.length - 26);
+  assert.equal(targets.filter((t) => t.removed).length, cube.cubes.length - 26);
   becoming.forEach((t) => assert.ok(Math.abs(t.scale - layout.dots[t.dot].diameter) < 1e-9, 'the size of its dot'));
+  targets.forEach((t, i) => { if (t.removed) assert.deepEqual([t.x, t.y, t.scale], [cells[i].x, cells[i].y, 0], 'a removed cube stays where it is'); });
 });
 
-test('the cubes chosen make the shortest flights: swapping any two does not help', () => {
+test('the cubes are chosen at random: different draws pick different cubes, and the same draw the same', () => {
   const layout = logoLayout({ stage, image: logoDots.image, dots: logoDots.dots, unitsPerPixel: 0.02 });
   const positions = arrangement(cube.cubes, cube.displayOrder, cube.size).map((c) => ({ x: c.x, y: c.y }));
-  const targets = finaleTargets(positions, layout);
-  const chosen = targets.map((t, i) => (t.scale > 0 ? i : -1)).filter((i) => i >= 0);
-  const length = (cubeIndex, dot) => Math.hypot(positions[cubeIndex].x - layout.dots[dot].x, positions[cubeIndex].y - layout.dots[dot].y);
-  const squared = (cubeIndex, dot) => length(cubeIndex, dot) ** 2;
-  const current = chosen.reduce((s, i) => s + squared(i, targets[i].dot), 0);
-  // exchange a chosen cube with one that is not chosen
-  const others = targets.map((t, i) => (t.scale === 0 ? i : -1)).filter((i) => i >= 0);
-  for (const i of chosen) {
-    for (const o of others.slice(0, 30)) {
-      const swapped = current - squared(i, targets[i].dot) + squared(o, targets[i].dot);
-      assert.ok(swapped >= current - 1e-9, 'no cheaper choice by swapping a cube for another');
+  const pick = (seed) => finaleTargets(positions, layout, mulberry32(seed)).map((t) => (t.removed ? 0 : 1)).join('');
+  assert.equal(pick(1), pick(1));
+  assert.notEqual(pick(1), pick(2));
+});
+
+test('the cubes chosen are paired with the dots so the flights are as short as can be', () => {
+  const layout = logoLayout({ stage, image: logoDots.image, dots: logoDots.dots, unitsPerPixel: 0.02 });
+  const positions = arrangement(cube.cubes, cube.displayOrder, cube.size).map((c) => ({ x: c.x, y: c.y }));
+  const targets = finaleTargets(positions, layout, mulberry32(3));
+  const chosen = targets.map((t, i) => (t.removed ? -1 : i)).filter((i) => i >= 0);
+  const squared = (i, dot) => (positions[i].x - layout.dots[dot].x) ** 2 + (positions[i].y - layout.dots[dot].y) ** 2;
+  for (const a of chosen) {
+    for (const b of chosen) {
+      const now = squared(a, targets[a].dot) + squared(b, targets[b].dot);
+      const swapped = squared(a, targets[b].dot) + squared(b, targets[a].dot);
+      assert.ok(swapped >= now - 1e-9, 'swapping two cubes does not shorten the flights');
     }
   }
 });
@@ -220,6 +227,7 @@ function fakeContext() {
     field: {
       capture: () => cells.map((c) => ({ p: { ...c }, q: { x: 0, y: 0, z: 0, w: 1 }, s: 1, colour: '#ffffff', spawned: true })),
       blendTo: (fn, alpha) => { log.push(['blend', alpha]); return Promise.resolve(); },
+      fadeOut: (indices, seconds) => { log.push(['fade', indices.length, seconds]); return Promise.resolve(); },
       flyTo: (targets, options) => { log.push(['fly', targets.length, options]); ctx.targets = targets; return Promise.resolve(); },
       setVisible: (v) => log.push(['visible', v]),
     },
@@ -253,14 +261,18 @@ test('the finale flies the cubes to the dots as the page goes black, then fades 
   assert.equal(fly[1], cube.cubes.length);
   assert.equal(fly[2].morph, 1);
   assert.equal(fly[2].glow, 1);
-  assert.equal(ctx.targets.filter((t) => t.scale > 0).length, 26);
-  assert.ok(ctx.targets.every((t) => Math.abs(t.z) < 1e-9), 'in the plane of the middle of the cube');
+  assert.equal(ctx.targets.filter((t) => t && t.scale > 0).length, 26);
+  assert.ok(ctx.targets.filter(Boolean).every((t) => Math.abs(t.z) < 1e-9), 'in the plane of the middle of the cube');
+  const fade = log.find((l) => l[0] === 'fade');
+  assert.equal(fade[1], cube.cubes.length - 26, 'the cubes not needed fade away');
+  assert.ok(names.indexOf('fade') < names.indexOf('fly'), 'before the others fly');
+  assert.deepEqual(log.find((l) => l[0] === 'view'), ['view', 'face'], 'the camera squares up as the cubes fly');
   assert.deepEqual(log.find((l) => l[0] === 'logo'), ['logo', 1]);
   assert.ok(names.indexOf('logo') > names.indexOf('fly'), 'the lock-up comes after the flight');
   assert.deepEqual(log.at(-1), ['visible', false], 'the cubes are hidden once the lock-up has taken over');
 });
 
-test('Back from the finale shows the cubes again, hides the lock-up and returns to the third Insight', async () => {
+test('Back from the finale shows the cubes again, hides the lock-up and returns to the conclusion view', async () => {
   const { ctx, log } = fakeContext();
   await finaleStep.reverse(ctx);
   assert.deepEqual(log[0], ['visible', true]);
@@ -269,6 +281,8 @@ test('Back from the finale shows the cubes again, hides the lock-up and returns 
   const fly = log.find((l) => l[0] === 'fly');
   assert.equal(fly[2].morph, 0);
   assert.equal(fly[2].glow, 0);
-  assert.deepEqual(log.find((l) => l[0] === 'titles'), ['titles', FACES.insight3.horizontal, FACES.insight3.vertical]);
+  assert.deepEqual(log.find((l) => l[0] === 'target'), ['target', CUBE.yaw, CUBE.tilt]);
+  assert.deepEqual(log.find((l) => l[0] === 'view'), ['view', 'cube']);
+  assert.equal(log.some((l) => l[0] === 'titles'), false, 'no axis titles in the conclusion');
   assert.ok(ctx.targets.every((t) => t.scale === 1), 'every cube returns at full size');
 });

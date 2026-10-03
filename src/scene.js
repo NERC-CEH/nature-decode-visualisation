@@ -17,7 +17,7 @@ const toRadians = (degrees) => (degrees * Math.PI) / 180;
 const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
 const BASE_FOV = 35; // degrees; the floor and cube views use this, the face views narrow it
 
-export function createScene(container) {
+export function createScene(container, stageElement = container) {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -187,13 +187,24 @@ export function createScene(container) {
   }
 
   function resize() {
-    const width = Math.max(1, container.clientWidth);
-    const height = Math.max(1, container.clientHeight);
-    renderer.setSize(width, height, false);
-    labelRenderer.setSize(width, height);
+    // The camera frames the scene in the stage; the canvas may be larger, reaching behind the
+    // caption above and the controls below, so the view is offset to match.
+    const width = Math.max(1, stageElement.clientWidth);
+    const height = Math.max(1, stageElement.clientHeight);
+    const fullWidth = Math.max(1, container.clientWidth);
+    const fullHeight = Math.max(1, container.clientHeight);
+    const top = stageElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    renderer.setSize(fullWidth, fullHeight, false);
+    labelRenderer.setSize(fullWidth, fullHeight);
     camera.aspect = width / height;
+    // The views are fitted to the stage alone, so fit them without the offset and then apply it.
+    camera.clearViewOffset();
     camera.updateProjectionMatrix();
     refit();
+    if (fullWidth !== width || fullHeight !== height) {
+      camera.setViewOffset(width, height, 0, -top, fullWidth, fullHeight);
+      camera.updateProjectionMatrix();
+    }
   }
   const resizeListeners = [];
   new ResizeObserver(() => {
@@ -232,8 +243,8 @@ export function createScene(container) {
     // The size of the stage in pixels and how big a pixel is, in world units, at the middle of the
     // cube in the face view (which is where the finale puts the logo).
     stage() {
-      const width = Math.max(1, container.clientWidth);
-      const height = Math.max(1, container.clientHeight);
+      const width = Math.max(1, stageElement.clientWidth);
+      const height = Math.max(1, stageElement.clientHeight);
       return { width, height, unitsPerPixel: views.face ? visibleHeight(views.face) / height : 0.02 };
     },
     // Called when the stage changes size.
@@ -241,13 +252,14 @@ export function createScene(container) {
       resizeListeners.push(fn);
     },
 
-    // Move the camera to the "floor" or "cube" view over `seconds`.
-    setView(name, seconds) {
+    // Move the camera to the "floor", "cube" or "face" view over `seconds`. With `share` below 1 it
+    // goes only that share of the way (a small pull back), and the next setView carries on from there.
+    setView(name, seconds, share = 1) {
       moving?.cancel();
       currentName = name;
-      const to = views[name];
-      if (!to || !current) return Promise.resolve();
+      if (!views[name] || !current) return Promise.resolve();
       const from = copyView(current);
+      const to = share < 1 ? interpolateView(from, views[name], share) : views[name];
       moving = tween({
         duration: seconds,
         easing: ease.inOutCubic,
@@ -287,6 +299,19 @@ export function createScene(container) {
       if (!pointerOver) return null;
       raycaster.setFromCamera(pointer, camera);
       return raycaster.ray.intersectPlane(plane, hit) ? { x: hit.x, z: hit.z } : null;
+    },
+    // Where a point in the cube group's space falls on the stage, in pixels from its top left, or
+    // null if it is behind the camera.
+    toStage(p) {
+      const v = new THREE.Vector3(p.x, p.y, p.z).applyMatrix4(cubeGroup.matrixWorld).project(camera);
+      if (v.z > 1) return null;
+      const full = container.getBoundingClientRect();
+      const stage = stageElement.getBoundingClientRect();
+      return {
+        depth: v.z, // larger is further from the camera
+        x: ((v.x + 1) / 2) * full.width + full.left - stage.left,
+        y: ((1 - v.y) / 2) * full.height + full.top - stage.top,
+      };
     },
     render() {
       renderer.render(scene, camera);

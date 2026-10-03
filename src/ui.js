@@ -5,12 +5,15 @@
 
 import { SIMULATED_NOTE } from './config.js';
 
-export function createUi({ steps, onNext, onBack, onRestart }) {
+// How long the title and caption take to slide and fade out and in, in milliseconds
+const FADE_OUT_MS = 900;
+const FADE_IN_MS = 1400;
+
+export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = () => {} }) {
   const $ = (id) => document.getElementById(id);
   const el = {
     app: $('app'),
     hero: $('hero'),
-    heroTitle: $('hero-title'),
     heroText: $('hero-text'),
     canvasWrap: $('canvas-wrap'),
     status: $('status'),
@@ -21,6 +24,8 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
     progressLabel: $('progress-label'),
     insight: $('insight-indicator'),
     note: $('note'),
+    credit: $('credit'),
+    body: document.querySelector('.caption-body'),
     back: $('back'),
     next: $('next'),
   };
@@ -28,6 +33,55 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
   steps.forEach(() => el.progress.appendChild(document.createElement('li')));
 
   let current = { canNext: false, canBack: false, canRestart: false };
+
+  // The title and text slide left and fade out, then the next ones slide in from the right and fade
+  // in. A step that sets `captionWhenReady` holds its caption back until the step has finished.
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const shift = reduceMotion ? 0 : 80;
+  // The footnote slides and fades with the title and text.
+  const slide = (from, to, ms) => Promise.all([el.body, el.note, el.credit].map((target) => target.animate(
+    [{ opacity: from, transform: `translateX(${from ? 0 : shift}px)` }, { opacity: to, transform: `translateX(${to ? 0 : -shift}px)` }],
+    { duration: ms, easing: 'ease', fill: 'forwards' },
+  ).finished));
+  let shownIndex = -1;
+  let captionRun = 0;
+  let waitingFor = null; // the step whose caption is waiting for it to finish
+  const setCaption = (step) => {
+    const hideNote = step.id === 'intro' || steps.indexOf(step) === steps.length - 1;
+    el.app.classList.toggle('is-statement', Boolean(step.statement));
+    el.app.classList.toggle('is-finale', Boolean(step.credit));
+    el.credit.hidden = !step.credit;
+    el.note.textContent = step.note ?? SIMULATED_NOTE;
+    el.note.classList.toggle('is-hidden', hideNote);
+    el.title.textContent = step.title;
+    el.text.textContent = step.text;
+    el.summary.textContent = step.summary ?? '';
+    el.insight.hidden = !step.insight;
+    el.insight.textContent = '';
+    if (step.insight) {
+      for (let n = 1; n <= 3; n++) {
+        const span = document.createElement('span');
+        span.textContent = n;
+        if (n === step.insight) span.className = 'current';
+        if (n > 1) el.insight.append(' · ');
+        el.insight.append(span);
+      }
+    }
+  };
+  async function changeCaption(state) {
+    const run = ++captionRun;
+    const { step } = state;
+    // Leaving the opening slide, its caption is not on show, so there is nothing to fade out.
+    await slide(1, 0, shownIndex === 0 ? 0 : FADE_OUT_MS).catch(() => {});
+    if (run !== captionRun) return;
+    setCaption(step);
+    if (step.captionWhenReady && current.busy) {
+      await new Promise((resolve) => { waitingFor = resolve; });
+      if (run !== captionRun) return;
+    }
+    await slide(0, 1, FADE_IN_MS).catch(() => {});
+    if (run === captionRun) onCaptionShown(step);
+  }
   const press = (flag, action) => () => { if (flag()) action(); };
   const goNext = press(() => current.canNext || current.canRestart, () => (current.canRestart ? onRestart() : onNext()));
   const goBack = press(() => current.canBack, onBack);
@@ -47,19 +101,14 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
     render(state) {
       current = state;
       const { step, index } = state;
+      if (!state.busy && waitingFor) { waitingFor(); waitingFor = null; }
       const isIntro = step.id === 'intro';
       const isFinale = index === steps.length - 1;
 
       el.app.classList.toggle('is-intro', isIntro);
       el.app.classList.toggle('is-busy', state.busy);
-      el.heroTitle.textContent = steps[0].title;
       el.heroText.textContent = steps[0].text;
-      el.title.textContent = step.title;
-      el.text.textContent = step.text;
-      el.summary.textContent = step.summary ?? '';
       el.canvasWrap.setAttribute('aria-label', step.canvasLabel);
-      el.note.textContent = step.note ?? SIMULATED_NOTE;
-      el.note.classList.toggle('is-hidden', isIntro || isFinale);
 
       el.progressLabel.textContent = `Step ${index + 1} of ${steps.length}`;
       [...el.progress.children].forEach((li, i) => {
@@ -68,18 +117,10 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
         else li.removeAttribute('aria-current');
       });
 
-      if (step.insight) {
-        el.insight.hidden = false;
-        el.insight.textContent = '';
-        for (let n = 1; n <= 3; n++) {
-          const span = document.createElement('span');
-          span.textContent = n;
-          if (n === step.insight) span.className = 'current';
-          if (n > 1) el.insight.append(' · ');
-          el.insight.append(span);
-        }
-      } else {
-        el.insight.hidden = true;
+      if (index !== shownIndex) {
+        if (shownIndex < 0) setCaption(step);
+        else changeCaption(state);
+        shownIndex = index;
       }
 
       el.next.textContent = isFinale ? 'Restart' : 'Next';

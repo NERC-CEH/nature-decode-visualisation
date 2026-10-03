@@ -1,18 +1,19 @@
 // The frame round the arranged data cube: a fine light-grey wireframe box, an arrow for the
 // direction of time, and the three axis titles. It fades in once the cubes are in their cells and
-// turns with the cube. Axis titles are HTML (so they stay sharp and readable) placed at points in
-// the 3D scene. There are no species or location names and no tick numbers, because the data is
+// turns with the cube. The three axis titles are flat text lying along the edges of the cube; the two
+// upright titles for a face view are HTML placed at points in the 3D scene. There are no species or location names and no tick numbers, because the data is
 // simulated.
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { EDGE_COLOUR } from './config.js';
 import { tween, ease } from './tween.js';
+import { createAxisText } from './axistext.js';
 
 const ARROW_COLOUR = '#4D4D4D';
 
 // `parent` is the group the cubes are in; `makeLabel(text)` returns a DOM element for a title.
-export function createFrame({ parent, staticParent = null, edge, centreY, makeLabel }) {
+export function createFrame({ parent, staticParent = null, edge, centreY, makeLabel, makeAxisText = createAxisText }) {
   const group = new THREE.Group();
   group.visible = false;
   parent.add(group);
@@ -34,17 +35,20 @@ export function createFrame({ parent, staticParent = null, edge, centreY, makeLa
   }
   group.add(arrow);
 
+  // The three axis titles lie along edges of the cube, in the same planes as the faces, so they turn
+  // with the cube: time under the arrow along the front, species up the left edge of the front, and
+  // location along the bottom of the right side.
+  const lift = Math.PI / 2;
   const labels = [
-    { text: 'Time', position: [0, below - 1.2, front] },
-    { text: 'Species', position: [-half - 1.3, centreY, front - 0.2] },
-    { text: 'Location', position: [half + 1.8, below - 0.3, 0] },
-  ].map(({ text, position }) => {
-    const element = makeLabel(text);
-    element.style.opacity = '0';
-    const object = new CSS2DObject(element);
-    object.position.set(...position);
-    group.add(object);
-    return { element, object };
+    { text: 'Time', axis: 'time', position: [0, below - 1.9, half], rotation: [0, 0, 0] },
+    { text: 'Species', axis: 'species', position: [-half - 1.3, centreY, half], rotation: [0, 0, lift] },
+    { text: 'Location', axis: 'location', position: [half + 1.3, below, 0], rotation: [0, lift, 0] },
+  ].map(({ text, axis, position, rotation }) => {
+    const mesh = makeAxisText(text);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    group.add(mesh);
+    return { mesh, text, axis };
   });
 
   // The two titles for a face view (the Insights) stay upright whatever angle the cube is at, so they
@@ -52,12 +56,17 @@ export function createFrame({ parent, staticParent = null, edge, centreY, makeLa
   const faceTitles = ['horizontal', 'vertical'].map((role) => {
     const element = makeLabel('');
     element.style.opacity = '0';
+    if (role === 'vertical') element.className += ' is-vertical';
     const object = new CSS2DObject(element);
     object.position.set(...(role === 'horizontal' ? [0, centreY - half - 1.0, 0] : [-half - 1.6, centreY, 0]));
     staticParent?.add(object);
     return { role, element, object, text: '' };
   });
 
+  // Each axis (its title, and for time the arrow too) can be held back while the rest of the frame
+  // shows, to be brought in by showAxis. 1 = free to show.
+  const axisAmount = { time: 1, species: 1, location: 1 };
+  const axisRunning = {};
   let amount = 0; // the box and, with the titles, the whole frame
   let titles = 0; // the arrow and the three axis titles
   let running = null;
@@ -67,9 +76,9 @@ export function createFrame({ parent, staticParent = null, edge, centreY, makeLa
   function apply() {
     group.visible = amount > 0.001 || titles > 0.001;
     lineMaterial.opacity = amount;
-    arrow.line.material.opacity = titles;
-    arrow.cone.material.opacity = titles;
-    for (const { element } of labels) element.style.opacity = String(titles);
+    arrow.line.material.opacity = titles * axisAmount.time;
+    arrow.cone.material.opacity = titles * axisAmount.time;
+    for (const { mesh, axis } of labels) mesh.material.opacity = titles * axisAmount[axis];
   }
 
   return {
@@ -109,8 +118,26 @@ export function createFrame({ parent, staticParent = null, edge, centreY, makeLa
       });
       return running.finished.then(() => undefined);
     },
-    // Fade only the arrow and the three axis titles, leaving the box. The face views use this.
+    // Hold all the axes back (0), or let them all show (1), at once.
+    setAxes(value) {
+      for (const axis of Object.keys(axisAmount)) { axisRunning[axis]?.cancel(); axisAmount[axis] = value; }
+      apply();
+    },
+    // Fade one axis ('time', 'species' or 'location') in, with its title (and the arrow, for time).
+    showAxis(axis, seconds) {
+      axisRunning[axis]?.cancel();
+      const from = axisAmount[axis];
+      axisRunning[axis] = tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (p) => { axisAmount[axis] = from + (1 - from) * p; apply(); },
+      });
+      return axisRunning[axis].finished.then(() => undefined);
+    },
+    // Fade only the arrow and the three axis titles, leaving the box. The face views use this, and
+    // showing them brings back every axis.
     fadeTitlesTo(target, seconds) {
+      if (target > 0) this.setAxes(1);
       titleRunning?.cancel();
       const from = titles;
       if (from === target) return Promise.resolve();

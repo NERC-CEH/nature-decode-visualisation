@@ -140,17 +140,19 @@ test('Back restores the scatter that the Categorise step ended with', async () =
 test('the sort step pulls the cubes to their heaps on the way in, and restores on the way back', async () => {
   const calls = [];
   const field = {
+    explode: () => { calls.push({ kind: 'explode' }); return Promise.resolve(); },
     steer: (targetOf, total, settle) => { calls.push({ kind: 'steer', targets: cube.cubes.slice(0, 3).map((_, i) => targetOf(i)), total, settle }); return Promise.resolve(); },
     restore: (snapshot, seconds) => { calls.push({ kind: 'restore', snapshot, seconds }); return Promise.resolve(); },
   };
   await sortStep.enter({ cube, arena, field });
   const snapshot = [{ spawned: true }];
   await sortStep.reverse({ cube, arena, field }, { snapshot });
-  assert.equal(calls[0].kind, 'steer');
+  assert.equal(calls[0].kind, 'explode', 'the cubes are thrown apart first');
+  assert.equal(calls[1].kind, 'steer');
   const spots = heapSpots(arena, cube.displayOrder);
-  calls[0].targets.forEach((t, i) => assert.deepEqual(t, spots[cube.cubes[i].species]));
-  assert.equal(calls[1].kind, 'restore');
-  assert.equal(calls[1].snapshot, snapshot);
+  calls[1].targets.forEach((t, i) => assert.deepEqual(t, spots[cube.cubes[i].species]));
+  assert.equal(calls[2].kind, 'restore');
+  assert.equal(calls[2].snapshot, snapshot);
 });
 
 test('the pull is the same at any frame rate: it runs in fixed physics steps', () => {
@@ -168,4 +170,42 @@ test('the pull is the same at any frame rate: it runs in fixed physics steps', (
   const b = run(1 / 20);
   assert.ok(Math.abs(a.elapsed - b.elapsed) < 0.06);
   assert.ok(Math.abs(a.x - b.x) < Math.max(1, a.x * 0.1), `60 fps ${a.x.toFixed(2)}, 20 fps ${b.x.toFixed(2)}`);
+});
+
+test('the explosion throws the cubes up and out, then holds them still in mid air', async () => {
+  const { field, physics } = await scatter();
+  const before = positionsOf(field);
+  // how far each cube is from its nearest neighbour, on average
+  const apart = (ps) => ps.reduce((sum, p, i) => sum + Math.min(...ps.filter((_, j) => j !== i).map((q) => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z))), 0) / ps.length;
+  const done = field.explode(0.5, 0.5);
+  let finished = false;
+  done.then(() => { finished = true; });
+  frames(field, physics, 0.6);
+  const frozen = positionsOf(field);
+  frames(field, physics, 0.3);
+  const held = positionsOf(field);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(finished, false, 'still holding');
+  const lifted = frozen.filter((p, i) => p.y > before[i].y + 0.3).length;
+  assert.ok(lifted > cube.cubes.length * 0.9, `${lifted} cubes are higher than before`);
+  assert.ok(apart(frozen) > apart(before) + 0.3, `the cubes are further apart (${apart(before).toFixed(2)} to ${apart(frozen).toFixed(2)})`);
+  const drift = Math.max(...held.map((p, i) => Math.hypot(p.x - frozen[i].x, p.y - frozen[i].y, p.z - frozen[i].z)));
+  assert.ok(drift < 0.25, `frozen cubes drift by at most ${drift.toFixed(2)}`);
+  frames(field, physics, 0.5);
+  await done;
+});
+
+test('the sort step is ready after a few seconds even if the pull has not finished', async () => {
+  const field = {
+    explode: () => Promise.resolve(),
+    steer: () => new Promise(() => {}),
+  };
+  const config = await import('../src/config.js');
+  const saved = config.DURATIONS.sortReady;
+  config.DURATIONS.sortReady = 0.05;
+  try {
+    await sortStep.enter({ cube, arena, field }); // would hang if it waited for the pull
+  } finally {
+    config.DURATIONS.sortReady = saved;
+  }
 });

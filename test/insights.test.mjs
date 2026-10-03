@@ -9,7 +9,7 @@ import { createFrame } from '../src/frame.js';
 import { createRotation } from '../src/rotate.js';
 import { arrangement, cubeFrame } from '../src/layout.js';
 import { interpolateView, visibleHeight } from '../src/views.js';
-import { FACES, insight1Step, insight2Step, insight3Step } from '../src/steps/insights.js';
+import { FACES, deepestStack, densityAlpha, insight1Step, insight2Step, insight3Step } from '../src/steps/insights.js';
 import { CUBE, FACE, STEPS, speciesColour } from '../src/config.js';
 import { loadCube } from '../src/data.js';
 
@@ -211,7 +211,9 @@ function fakeContext() {
   const log = [];
   const ctx = {
     cube,
-    field: { blendTo: (fn, alpha) => { log.push(['blend', alpha, fn(0)]); return Promise.resolve(); } },
+    field: {
+      blendTo: (fn, alpha) => { log.push(['blend', alpha, fn(0)]); return Promise.resolve(); },
+    },
     scene: { setView: (name) => { log.push(['view', name]); return Promise.resolve(); } },
     frame: {
       fadeTitlesTo: (a) => { log.push(['titles', a]); return Promise.resolve(); },
@@ -228,10 +230,12 @@ test('each Insight step turns to its face, narrows the view, and names its axes'
     const { ctx, log } = fakeContext();
     await step.enter(ctx);
     assert.deepEqual(log.find((l) => l[0] === 'target'), ['target', face.yaw, face.pitch]);
-    assert.deepEqual(log.find((l) => l[0] === 'view'), ['view', 'face']);
+    const views = log.filter((l) => l[0] === 'view');
+    assert.ok(views.length >= 1);
+    assert.deepEqual(views[views.length - 1], ['view', 'face'], 'final view is the face view');
     assert.deepEqual(log.find((l) => l[0] === 'faceTitles'), ['faceTitles', face.horizontal, face.vertical]);
     const blend = log.find((l) => l[0] === 'blend');
-    assert.equal(blend[1], face.neutral ? FACE.neutralAlpha : FACE.alpha);
+    assert.equal(blend[1], face.neutral ? densityAlpha(cube) : FACE.alpha);
     if (face.neutral) assert.equal(blend[2], FACE.neutral);
     else assert.equal(blend[2], speciesColour(cube.cubes[0].species));
   }
@@ -259,4 +263,13 @@ test('the layout puts the arranged cube where the face views expect it', () => {
   const mid = (values) => (Math.min(...values) + Math.max(...values)) / 2;
   assert.ok(Math.abs(mid(cells.map((c) => c.x))) < cube.size);
   assert.ok(centreY > 0);
+});
+
+test('the top view is toned so the deepest line of cubes is nearly black and a single cube is clearly lighter', () => {
+  const alpha = densityAlpha(cube);
+  const stack = deepestStack(cube);
+  const through = (n) => (1 - alpha) ** n;
+  assert.ok(stack >= 3, `the data has stacks of up to ${stack}`);
+  assert.ok(Math.abs(through(stack) - FACE.densityFloor) < 1e-9);
+  assert.ok(through(1) > 0.4 && through(2) < through(1) - 0.15, 'one cube against two: a clear step');
 });

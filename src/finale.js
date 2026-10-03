@@ -69,20 +69,28 @@ export function assign(cost) {
 }
 
 // For every cube, where it goes in the finale. `positions[i]` is where cube i is now ({ x, y }),
-// `layout` is from logoLayout. As many cubes as there are dots become the dots, chosen so the
-// flights are as short as can be; every other cube flies to the nearest dot and shrinks to
-// nothing on arrival. Returns, for each cube, { x, y, scale } with scale in world units (the
-// diameter of a dot), or 0 for the cubes that vanish.
-export function finaleTargets(positions, layout) {
+// `layout` is from logoLayout, `random()` gives numbers in 0..1. As many cubes as there are dots are
+// chosen at random to become the dots, and are paired with the dots so the flights are as short as
+// can be. Every other cube is `removed`: it is to fade away before the flight and takes no part in it.
+// Returns, for each cube, { x, y, scale, dot, removed } with scale in world units (the diameter of
+// a dot), or 0 for the cubes that are removed.
+export function finaleTargets(positions, layout, random = Math.random) {
   const dots = layout.dots;
   const distance = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
   const targets = new Array(positions.length);
-  const used = new Set();
   if (positions.length >= dots.length) {
-    const chosen = assign(dots.map((dot) => positions.map((p) => distance(p, dot))));
-    chosen.forEach((cube, dotIndex) => {
-      targets[cube] = { x: dots[dotIndex].x, y: dots[dotIndex].y, scale: dots[dotIndex].diameter, dot: dotIndex };
-      used.add(cube);
+    const order = positions.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const chosen = order.slice(0, dots.length);
+    const pairs = assign(dots.map((dot) => chosen.map((c) => distance(positions[c], dot))));
+    pairs.forEach((k, dotIndex) => {
+      targets[chosen[k]] = { x: dots[dotIndex].x, y: dots[dotIndex].y, scale: dots[dotIndex].diameter, dot: dotIndex, removed: false };
+    });
+    positions.forEach((p, cube) => {
+      if (!targets[cube]) targets[cube] = { x: p.x, y: p.y, scale: 0, dot: -1, removed: true };
     });
   } else {
     // fewer cubes than dots: each cube takes the nearest free dot, and the spare dots show only in the logo
@@ -91,16 +99,9 @@ export function finaleTargets(positions, layout) {
       let best = -1;
       for (const d of free) if (best < 0 || distance(p, dots[d]) < distance(p, dots[best])) best = d;
       free.delete(best);
-      targets[cube] = { x: dots[best].x, y: dots[best].y, scale: dots[best].diameter, dot: best };
-      used.add(cube);
+      targets[cube] = { x: dots[best].x, y: dots[best].y, scale: dots[best].diameter, dot: best, removed: false };
     });
   }
-  positions.forEach((p, cube) => {
-    if (used.has(cube)) return;
-    let best = 0;
-    dots.forEach((dot, d) => { if (distance(p, dot) < distance(p, dots[best])) best = d; });
-    targets[cube] = { x: dots[best].x, y: dots[best].y, scale: 0, dot: best };
-  });
   return targets;
 }
 

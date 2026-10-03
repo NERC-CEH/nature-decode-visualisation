@@ -133,7 +133,8 @@ test('the frame starts hidden and has titles for the three axes', () => {
   const { frame, made } = makeFrame();
   assert.equal(frame.amount, 0);
   assert.equal(frame.group.visible, false);
-  assert.deepEqual(made.slice(0, 3).map((m) => m.textContent), ['Time', 'Species', 'Location']);
+  assert.deepEqual(frame.labels.map((l) => l.text), ['Time', 'Species', 'Location']);
+  assert.ok(frame.labels.every((l) => l.mesh.material.opacity === 0));
   assert.ok(made.every((m) => m.style.opacity === '0'));
 });
 
@@ -142,10 +143,10 @@ test('the frame fades in and out, together with its titles', async () => {
   await frame.fadeTo(1, 0.05);
   assert.equal(frame.amount, 1);
   assert.equal(frame.group.visible, true);
-  assert.ok(made.slice(0, 3).every((m) => m.style.opacity === '1'));
+  assert.ok(frame.labels.every((l) => l.mesh.material.opacity === 1));
   await frame.fadeTo(0, 0.05);
   assert.equal(frame.group.visible, false);
-  assert.ok(made.every((m) => m.style.opacity === '0'));
+  assert.ok(frame.labels.every((l) => l.mesh.material.opacity === 0));
 });
 
 // ---- the flight to the cells ------------------------------------------------------------------
@@ -231,7 +232,7 @@ test('the arrange step arranges the cubes, raises the camera and shows the frame
     setView: (name) => { calls.push(['view', name]); return Promise.resolve(); },
     fadeShadow: (amount) => { calls.push(['shadow', amount]); return Promise.resolve(); },
   };
-  const frame = { fadeTo: (amount) => { calls.push(['frame', amount]); return Promise.resolve(); } };
+  const frame = { setAxes: () => {}, fadeTo: (amount) => { calls.push(['frame', amount]); return Promise.resolve(); } };
   const targets = [];
   const rotation = { setTarget: (t) => targets.push(t) };
   const ctx = { cube, field, scene, frame, rotation };
@@ -249,4 +250,25 @@ test('the arrange step arranges the cubes, raises the camera and shows the frame
   assert.deepEqual(calls.find((c) => c[0] === 'shadow'), ['shadow', 1]);
   assert.deepEqual(calls.find((c) => c[0] === 'frame'), ['frame', 0]);
   assert.equal(calls.find((c) => c[0] === 'restore')[1], snapshot);
+});
+
+test('each axis can be held back and brought in on its own, and showing the titles again brings back all of them', async () => {
+  const made = [];
+  const frame = createFrame({
+    parent: new THREE.Group(),
+    edge: 11.25,
+    centreY: 7.1,
+    makeLabel: (text) => { const element = { textContent: text, style: {}, className: '', setAttribute() {} }; made.push(element); return element; },
+  });
+  await frame.fadeTo(1, 0.03);
+  frame.setAxes(0);
+  assert.deepEqual(frame.labels.map((l) => String(l.mesh.material.opacity)), ['0', '0', '0']);
+  await frame.showAxis('species', 0.03);
+  assert.deepEqual(frame.labels.map((l) => String(l.mesh.material.opacity)), ['0', '1', '0'], 'only the species title');
+  await frame.showAxis('time', 0.03);
+  assert.equal(frame.group.children.find((c) => c.isObject3D && c.line)?.line.material.opacity, 1, 'the arrow comes with time');
+  frame.setAxes(0);
+  await frame.fadeTitlesTo(0, 0.03);
+  await frame.fadeTitlesTo(1, 0.03);
+  assert.deepEqual(frame.labels.map((l) => String(l.mesh.material.opacity)), ['1', '1', '1']);
 });

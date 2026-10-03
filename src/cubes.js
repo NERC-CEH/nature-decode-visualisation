@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
-import { ARENA, DURATIONS, PHYSICS, SORT } from './config.js';
+import { ARENA, DURATIONS, EXPLODE, PHYSICS, SORT } from './config.js';
 import { steer, steerStrength } from './steering.js';
 import { mulberry32 } from './random.js';
 
@@ -76,6 +76,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   let pending = []; // cubes waiting to drop, with their plan entries
   let onDropped = null;
   let recolouring = null;
+  let exploding = null; // { elapsed, freezeAt, total, done } while the cubes are thrown up and held
   let steering = null; // { targets, elapsed, total, done } while the Sort pull is running
 
   // Solid cubes are opaque and write depth; see-through ones (the face views) blend, and the more
@@ -155,8 +156,35 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     }
   }
 
+  // After the throw, the cubes are stopped dead and held where they are: their speed is damped away
+  // and an upward force cancels gravity, until the hold is over.
+  function holdCubes(dt) {
+    const blast = exploding;
+    blast.elapsed += dt;
+    if (blast.elapsed >= blast.freezeAt) {
+      const damp = Math.exp(-dt * 30);
+      const lift = -PHYSICS.gravity;
+      for (let i = 0; i < count; i++) {
+        const body = state[i].body;
+        if (!body) continue;
+        body.wakeUp();
+        body.velocity.scale(damp, body.velocity);
+        body.angularVelocity.scale(damp, body.angularVelocity);
+        body.force.y += lift * body.mass;
+      }
+    }
+    if (blast.elapsed >= blast.total) {
+      exploding = null;
+      for (let i = 0; i < count; i++) state[i].body?.wakeUp();
+      blast.done();
+    }
+  }
+
   // The pull is applied before every fixed physics step, so it is the same at any frame rate.
-  physics.onStep((dt) => { if (steering) steerCubes(dt); });
+  physics.onStep((dt) => {
+    if (exploding) holdCubes(dt);
+    if (steering) steerCubes(dt);
+  });
 
   const field = {
     mesh,
@@ -177,6 +205,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       pending = [];
       onDropped = null;
       steering = null;
+      exploding = null;
       recolouring?.cancel();
       setSolid();
       setGlow(0); // and back to cubes, shown and shaded, after the finale
@@ -257,6 +286,14 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       return recolouring.finished.then(() => undefined);
     },
 
+    // Where cube `i` is now, or null if it has not been released yet.
+    positionOf(i) {
+      const source = state[i].body ?? state[i].pose;
+      if (!source) return null;
+      const p = source.position ?? source.p;
+      return { x: p.x, y: p.y, z: p.z };
+    },
+
     // The pose and colour of every cube, so a step can be returned to later.
     capture() {
       return state.map((s, i) => {
@@ -273,6 +310,39 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
           colour: `#${colour.getHexString()}`,
         };
       });
+    },
+
+    // Fade the cubes `indices` away: they lose their colour towards the page's white and shrink to nothing,
+    // so the others are left on their own. Each is a pose, as after the Arrange step.
+    fadeOut(indices, seconds) {
+      const fading = [];
+      for (const i of indices) {
+        const s = state[i];
+        const source = s.body ?? s.pose;
+        if (!source) continue;
+        const p = source.position ?? source.p;
+        const q = source.quaternion ?? source.q;
+        if (s.body) physics.removeCube(s.body);
+        s.body = null;
+        s.pose = { p: { x: p.x, y: p.y, z: p.z }, q: { x: q.x, y: q.y, z: q.z, w: q.w }, s: source.s ?? 1 };
+        mesh.getColorAt(i, colour);
+        fading.push({ i, from: colour.clone(), size: s.pose.s });
+      }
+      if (!fading.length) return Promise.resolve();
+      const white = new THREE.Color('#ffffff');
+      return tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (t) => {
+          const shrink = Math.max(0, (t - 0.4) / 0.6);
+          for (const { i, from, size } of fading) {
+            mesh.setColorAt(i, colour.copy(from).lerp(white, t));
+            state[i].pose.s = size * (1 - shrink);
+          }
+          mesh.instanceColor.needsUpdate = true;
+          field.sync();
+        },
+      }).finished.then(() => undefined);
     },
 
     // Fly every cube to its target `targets[i]` ({ x, y, z, scale }), turning it to face the camera,
@@ -356,6 +426,30 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       });
     },
 
+    // Throw every cube up and away from the middle of the pile, as if by an explosion, then hold them
+    // frozen in mid air. Resolves when the hold is over. The throw lasts `freezeAt` seconds and the hold
+    // `hold` seconds.
+    explode(freezeAt = DURATIONS.explode, hold = DURATIONS.freeze) {
+      const bodies = state.map((s) => s.body).filter(Boolean);
+      const centre = { x: 0, z: 0 };
+      for (const b of bodies) { centre.x += b.position.x / bodies.length; centre.z += b.position.z / bodies.length; }
+      const random = mulberry32(ARENA.spawnSeed + 47);
+      for (const b of bodies) {
+        b.wakeUp();
+        let dx = b.position.x - centre.x;
+        let dz = b.position.z - centre.z;
+        let d = Math.hypot(dx, dz);
+        if (d < 0.5) { const a = random() * Math.PI * 2; dx = Math.cos(a); dz = Math.sin(a); d = 1; }
+        const outward = EXPLODE.outward * (0.5 + random());
+        const up = EXPLODE.up * (0.6 + 0.8 * random()) + EXPLODE.lowBonus / (1 + Math.max(0, b.position.y));
+        b.velocity.set((dx / d) * outward, up, (dz / d) * outward);
+        b.angularVelocity.set((random() - 0.5) * 2 * EXPLODE.spin, (random() - 0.5) * 2 * EXPLODE.spin, (random() - 0.5) * 2 * EXPLODE.spin);
+      }
+      return new Promise((resolve) => {
+        exploding = { elapsed: 0, freezeAt, total: freezeAt + hold, done: resolve };
+      });
+    },
+
     // Pull every cube across the floor to the spot `targetOf(i)` ({ x, z }) gives, so that the cubes
     // pile up there by physics. Resolves `settle` seconds after the pull ends.
     steer(targetOf, total = DURATIONS.sort, settle = DURATIONS.sortSettle) {
@@ -369,6 +463,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     // back to physics. Physics cannot be rewound, so this is how Back returns to a step.
     restore(snapshot, seconds = DURATIONS.sortBack) {
       steering = null;
+      exploding = null;
       const moving = [];
       state.forEach((s, i) => {
         const to = snapshot?.[i];

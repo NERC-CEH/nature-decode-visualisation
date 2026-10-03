@@ -13,6 +13,7 @@ export const arrangeStep = {
     const cells = arrangement(cube.cubes, cube.displayOrder, cube.size);
     const sheets = sheetOf(cube.cubes, cube.displayOrder);
     rotation.setTarget({ yaw: CUBE.yaw, pitch: CUBE.tilt });
+    frame?.setAxes(0); // the axis titles and the arrow come in one by one with the labels
     await Promise.all([
       field.arrange(cells, (i) => sheets[i], cube.size, DURATIONS.arrange, DURATIONS.arrangeFlight),
       scene?.setView('cube', DURATIONS.arrange),

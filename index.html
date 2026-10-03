@@ -9,34 +9,34 @@
 </head>
 <body>
   <div id="app" class="app is-intro">
+    <header class="caption">
+      <div class="caption-body" aria-live="polite" aria-atomic="true">
+        <h2 id="caption-title"></h2>
+        <p id="insight-indicator" class="insight-indicator" aria-hidden="true" hidden></p>
+        <p id="caption-text"></p>
+        <p id="caption-summary" class="visually-hidden"></p>
+      </div>
+    </header>
     <main class="stage">
       <div id="canvas-wrap" class="canvas-wrap" role="img" aria-label=""></div>
       <div id="hero" class="hero" aria-hidden="true">
-        <h1 id="hero-title"></h1>
-        <p id="hero-text"></p>
+        <h1 id="hero-text"></h1>
+        <img class="hero-logo" src="assets/UKCEH_Logo_Tagline_Stacked_White_Data.png" alt="">
       </div>
+      <div id="callouts" class="callouts" aria-hidden="true"></div>
       <img id="logo" class="logo" src="assets/UKCEH_Logo_Tagline_Stacked_White_Data.png" alt="UKCEH. Our planet. Decoded." hidden>
       <p id="status" class="status" role="alert" hidden></p>
     </main>
 
-    <footer class="caption">
-      <div class="caption-row">
-        <div class="caption-main">
-          <div class="caption-body" aria-live="polite" aria-atomic="true">
-            <h2 id="caption-title"></h2>
-            <p id="insight-indicator" class="insight-indicator" aria-hidden="true" hidden></p>
-            <p id="caption-text"></p>
-            <p id="caption-summary" class="visually-hidden"></p>
-          </div>
-          <p id="note" class="note is-hidden"></p>
-        </div>
-        <div class="caption-controls">
-          <ol id="progress" class="progress" aria-hidden="true"></ol>
-          <p id="progress-label" class="visually-hidden"></p>
-          <div class="buttons">
-            <button id="back" type="button" aria-disabled="true">Back</button>
-            <button id="next" type="button" class="primary">Next</button>
-          </div>
+    <footer class="controls">
+      <p id="credit" class="note credit" hidden><a href="https://www.ceh.ac.uk/staff/tom-august" target="_blank" rel="noopener">Design and implementation by Tom August</a></p>
+      <p id="note" class="note is-hidden"></p>
+      <div class="caption-controls">
+        <ol id="progress" class="progress" aria-hidden="true"></ol>
+        <p id="progress-label" class="visually-hidden"></p>
+        <div class="buttons">
+          <button id="back" type="button" aria-disabled="true">Back</button>
+          <button id="next" type="button" class="primary">Next</button>
         </div>
       </div>
     </footer>

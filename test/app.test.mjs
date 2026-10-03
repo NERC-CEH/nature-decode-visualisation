@@ -120,10 +120,11 @@ test('an error in a step animation leaves the controller usable', async () => {
 
 test('the configured steps are in the order the spec gives', () => {
   assert.deepEqual(STEPS.map((s) => s.id),
-    ['intro', 'data', 'categorise', 'sort', 'arrange', 'insight1', 'insight2', 'insight3', 'finale']);
+    ['intro', 'data', 'categorise', 'sort', 'arrange', 'insight1', 'insight2', 'insight3', 'conclusion', 'finale']);
   assert.deepEqual(STEPS.map((s) => s.theme),
-    ['dark', 'light', 'light', 'light', 'light', 'light', 'light', 'light', 'dark']);
-  assert.ok(STEPS.every((s) => s.title && s.text && s.canvasLabel));
+    ['dark', 'light', 'light', 'light', 'light', 'light', 'light', 'light', 'light', 'dark']);
+  assert.ok(STEPS.every((s) => s.title && s.canvasLabel));
+  assert.ok(STEPS.filter((s) => !s.statement).every((s) => s.text), 'every step has a caption except the conclusion, which is a title alone');
 });
 
 // ---- theme ---------------------------------------------------------------------------
