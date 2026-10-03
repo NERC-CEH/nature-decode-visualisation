@@ -133,7 +133,7 @@ test('the frame starts hidden and has titles for the three axes', () => {
   const { frame, made } = makeFrame();
   assert.equal(frame.amount, 0);
   assert.equal(frame.group.visible, false);
-  assert.deepEqual(made.map((m) => m.textContent), ['Time', 'Species', 'Location']);
+  assert.deepEqual(made.slice(0, 3).map((m) => m.textContent), ['Time', 'Species', 'Location']);
   assert.ok(made.every((m) => m.style.opacity === '0'));
 });
 
@@ -142,7 +142,7 @@ test('the frame fades in and out, together with its titles', async () => {
   await frame.fadeTo(1, 0.05);
   assert.equal(frame.amount, 1);
   assert.equal(frame.group.visible, true);
-  assert.ok(made.every((m) => m.style.opacity === '1'));
+  assert.ok(made.slice(0, 3).every((m) => m.style.opacity === '1'));
   await frame.fadeTo(0, 0.05);
   assert.equal(frame.group.visible, false);
   assert.ok(made.every((m) => m.style.opacity === '0'));

@@ -58,6 +58,7 @@ const field = scene
 const frame = scene
   ? createFrame({
     parent: scene.cubeGroup,
+    staticParent: scene.faceGroup,
     edge: cubeBox.edge,
     centreY: cubeBox.centreY,
     makeLabel: (text) => {
@@ -91,6 +92,7 @@ const ctx = {
   reset: () => Promise.all([
     field?.liftAway(DURATIONS.lift),
     frame?.fadeTo(0, DURATIONS.frameFade / 2),
+    frame?.hideFaceTitles(0.2),
     scene?.setView('floor', DURATIONS.lift),
     scene?.fadeShadow(1, DURATIONS.lift),
     rotation?.setTarget({ yaw: 0, pitch: 0 }),

@@ -49,6 +49,7 @@ export const DURATIONS = {
   sort: 3.0, // the cubes are pulled into their heaps for this long...
   sortSettle: 0.5, // ...and the step is ready this long after the pull ends
   sortBack: 1.2, // on Back the cubes ease back to where they were
+  look: 1.0, // cubes change between solid and see-through, and between colours and grey
   arrange: 3.5, // every cube is in its cell within this time: heaps lift one after another...
   arrangeFlight: 1.5, // ...and each cube takes this long to fly to its cell
   arrangeFrame: 2.0, // the frame (box, arrow and titles) starts to fade in this long after the lift starts...
@@ -142,11 +143,26 @@ export const CUBE = {
   tilt: 0.05,
 };
 
+// The face views (the Insights): the camera looks straight at a face of the cube through a view
+// this many degrees wide (narrow, so that perspective all but disappears), with `margin` times the
+// room the face needs for itself and its two axis titles. Cubes are drawn see-through there: a cube
+// is `alpha` opaque (`neutralAlpha` when species have been put together), so the more cubes lie
+// behind each other along the line of sight, the darker the cell. `neutral` is the grey they take
+// when the colours mean nothing.
+export const FACE = {
+  fov: 3,
+  margin: 1.45,
+  alpha: 0.6,
+  neutralAlpha: 0.4,
+  neutral: '#333333',
+  turn: 1.6, // seconds to turn from one face to the next
+};
+
 // Dragging the cube: radians turned per pixel dragged, the furthest it can tilt, and the stiffness
 // of the spring that returns it (larger is faster; the spring is critically damped).
 export const ROTATE = {
   sensitivity: 0.008,
-  maxPitch: 1.3,
+  maxPitch: 1.8,
   spring: 9,
 };
 
@@ -169,7 +185,7 @@ export const SIMULATED_NOTE = 'Simulated data.';
 export const TAGLINE = 'Our planet. Decoded.';
 
 // One entry per step, in order. `theme` is the page colour for that step.
-// `repel` marks steps where the cursor pushes the cubes, and `rotate` those where the cube can be dragged round. `canvasLabel` describes the 3D scene
+// `repel` marks steps where the cursor pushes the cubes, and `rotate` those where the cube can be dragged round, and `note` replaces the footnote. `canvasLabel` describes the 3D scene
 // for screen readers. `summary` is the plain-text description of the pattern an Insight shows.
 export const STEPS = [
   {
@@ -215,6 +231,7 @@ export const STEPS = [
     id: 'insight1',
     title: 'Insights',
     rotate: true,
+    note: 'Simulated data. Darker means more records.',
     text: 'Species by location. Generalist species occur in many locations. Specialist species occur in few, because they depend on particular habitats.',
     theme: 'light',
     insight: 1,
@@ -225,6 +242,7 @@ export const STEPS = [
     id: 'insight2',
     title: 'Insights',
     rotate: true,
+    note: 'Simulated data. Darker means more records.',
     text: 'Location by time. Records grow over time across locations, as more people record wildlife with smartphone apps.',
     theme: 'light',
     insight: 2,
@@ -235,6 +253,7 @@ export const STEPS = [
     id: 'insight3',
     title: 'Insights',
     rotate: true,
+    note: 'Simulated data. Darker means more records.',
     text: 'Species by time. Overall recording rises, yet specialist records fall. That pattern points to a decline.',
     theme: 'light',
     insight: 3,

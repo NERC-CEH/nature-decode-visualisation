@@ -9,11 +9,13 @@
 
 import * as THREE from 'three';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { CAMERA, CUBE } from './config.js';
+import { CAMERA, CUBE, FACE } from './config.js';
 import { tween, ease } from './tween.js';
+import { interpolateView } from './views.js';
 
 const toRadians = (degrees) => (degrees * Math.PI) / 180;
 const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
+const BASE_FOV = 35; // degrees; the floor and cube views use this, the face views narrow it
 
 export function createScene(container) {
   let renderer;
@@ -32,7 +34,7 @@ export function createScene(container) {
   container.appendChild(labelRenderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 500);
+  const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.1, 2000);
 
   // Soft ambient light from above plus one key light that casts the shadows.
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 1.6));
@@ -60,7 +62,11 @@ export function createScene(container) {
   pivot.add(cubeGroup);
   scene.add(pivot);
 
-  const views = { floor: null, cube: null };
+  // Titles for the two axes in a face view stay upright, so they live outside the pivot.
+  const faceGroup = new THREE.Group();
+  scene.add(faceGroup);
+
+  const views = { floor: null, cube: null, face: null };
   let arena = null;
   let frame = null; // { centreY, radius } of the arranged cube
   let spawnY = 20;
@@ -69,13 +75,17 @@ export function createScene(container) {
   let moving = null;
   const corner = new THREE.Vector3();
 
-  function place({ target, distance, elevation }) {
+  function place({ target, distance, elevation, fov = BASE_FOV }) {
+    if (camera.fov !== fov) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
     const up = toRadians(elevation);
     camera.position.set(target.x, target.y + Math.sin(up) * distance, target.z + Math.cos(up) * distance);
     camera.lookAt(target);
     camera.updateMatrixWorld();
   }
-  const copyView = (v) => ({ target: v.target.clone(), distance: v.distance, elevation: v.elevation });
+  const copyView = (v) => ({ target: v.target.clone(), distance: v.distance, elevation: v.elevation, fov: v.fov ?? BASE_FOV });
 
   // The floor view: the whole floor fits, and the floor sits a third of the way up the screen.
   function fitFloor() {
@@ -86,7 +96,7 @@ export function createScene(container) {
         for (const z of [-depth / 2, depth / 2]) corners.push([x, y, z]);
       }
     }
-    const view = { target: new THREE.Vector3(0, 0.5, 0), distance: 100, elevation: CAMERA.elevation };
+    const view = { target: new THREE.Vector3(0, 0.5, 0), distance: 100, elevation: CAMERA.elevation, fov: BASE_FOV };
     const visible = (distance) => {
       place({ ...view, distance });
       return corners.every((c) => {
@@ -141,15 +151,34 @@ export function createScene(container) {
   // in the view whatever its shape.
   function fitCube() {
     const radius = frame.lookRadius * CUBE.margin;
-    const vertical = toRadians(camera.fov);
+    const vertical = toRadians(BASE_FOV);
     const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
     const distance = radius / Math.sin(Math.min(vertical, horizontal) / 2);
-    return { target: new THREE.Vector3(0, frame.lookY, 0), distance, elevation: CUBE.elevation };
+    return { target: new THREE.Vector3(0, frame.lookY, 0), distance, elevation: CUBE.elevation, fov: BASE_FOV };
+  }
+
+  // The face views: straight on to a face of the cube, from so far away with so narrow a view that
+  // the lines of sight are almost parallel (perspective is a few per cent at the most), so the
+  // cells line up in a flat grid. The face, with room for its two axis titles, fits the view.
+  function fitFace() {
+    const fov = FACE.fov;
+    const half = (frame.edge / 2) * FACE.margin;
+    const tan = Math.tan(toRadians(fov) / 2);
+    const distance = Math.max(half / tan, half / (tan * camera.aspect));
+    return { target: new THREE.Vector3(0, frame.centreY, 0), distance, elevation: 0, fov };
   }
 
   function refit() {
+    const fov = camera.fov;
+    camera.fov = BASE_FOV; // the fits below measure with the usual field of view
+    camera.updateProjectionMatrix();
     if (arena) views.floor = fitFloor();
-    if (frame) views.cube = fitCube();
+    if (frame) {
+      views.cube = fitCube();
+      views.face = fitFace();
+    }
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
     // keep the camera on its current view when the window changes, unless it is on the move
     if (!moving && views[currentName]) {
       current = copyView(views[currentName]);
@@ -187,6 +216,7 @@ export function createScene(container) {
     camera,
     pivot,
     cubeGroup,
+    faceGroup,
     labelParent: labelRenderer.domElement,
 
     setArena(size) { arena = size; refit(); },
@@ -206,11 +236,9 @@ export function createScene(container) {
         duration: seconds,
         easing: ease.inOutCubic,
         onUpdate: (t) => {
-          current = {
-            target: from.target.clone().lerp(to.target, t),
-            distance: from.distance + (to.distance - from.distance) * t,
-            elevation: from.elevation + (to.elevation - from.elevation) * t,
-          };
+          // a dolly zoom where the field of view changes (see views.js)
+          const next = interpolateView(from, to, t);
+          current = { ...next, target: new THREE.Vector3(next.target.x, next.target.y, next.target.z) };
           place(current);
         },
       });

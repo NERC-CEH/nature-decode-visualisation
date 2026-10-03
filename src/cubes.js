@@ -50,7 +50,8 @@ function shadowDepthMaterial(getFadeTop) {
 // above the visible frame to release cubes from.
 export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () => 20 }) {
   const count = cubes.length;
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }), count);
+  const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 });
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, count);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   const shadowMaterial = shadowDepthMaterial(() => getSpawnY());
@@ -66,6 +67,15 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
   let onDropped = null;
   let recolouring = null;
   let steering = null; // { targets, elapsed, total, done } while the Sort pull is running
+
+  // Solid cubes are opaque and write depth; see-through ones (the face views) blend, and the more
+  // lie behind each other along the line of sight the darker the result.
+  function setSolid() {
+    material.opacity = 1;
+    material.transparent = false;
+    material.depthWrite = true;
+    material.needsUpdate = true;
+  }
 
   function hide(i) {
     dummy.position.set(0, -100, 0);
@@ -131,6 +141,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
 
   const field = {
     mesh,
+    material,
     count,
 
     // Remove every cube, instantly.
@@ -146,6 +157,8 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       pending = [];
       onDropped = null;
       steering = null;
+      recolouring?.cancel();
+      setSolid();
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     },
@@ -235,6 +248,37 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
           q: { x: q.x, y: q.y, z: q.z, w: q.w },
           colour: `#${colour.getHexString()}`,
         };
+      });
+    },
+
+    // Fade every cube to the colour `colourOf(i)` returns and to `alpha` (1 = solid, less =
+    // see-through), all together, over `seconds`.
+    blendTo(colourOf, alpha, seconds = DURATIONS.look) {
+      recolouring?.cancel();
+      const from = [];
+      const to = [];
+      for (let i = 0; i < count; i++) {
+        mesh.getColorAt(i, colour);
+        from.push(colour.clone());
+        to.push(new THREE.Color(colourOf(i)));
+      }
+      const alphaFrom = material.opacity;
+      if (alpha < 1 || alphaFrom < 1) {
+        material.transparent = true;
+        material.depthWrite = false;
+        material.needsUpdate = true;
+      }
+      recolouring = tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (t) => {
+          material.opacity = alphaFrom + (alpha - alphaFrom) * t;
+          for (let i = 0; i < count; i++) mesh.setColorAt(i, colour.copy(from[i]).lerp(to[i], t));
+          mesh.instanceColor.needsUpdate = true;
+        },
+      });
+      return recolouring.finished.then((completed) => {
+        if (completed && alpha >= 1) setSolid();
       });
     },
 

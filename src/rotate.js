@@ -21,6 +21,7 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
     enabled: false,
   };
   let last = null;
+  const waiting = [];
 
   const apply = () => pivot.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
 
@@ -81,6 +82,15 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
         state[angle] = goal + error;
       }
       apply();
+      if (waiting.length && rotation.atRest) waiting.splice(0).forEach((resolve) => resolve());
+    },
+
+    // Resolves once the cube has come to rest at its target (or after `timeout` seconds).
+    arrive(timeout = 4) {
+      return new Promise((resolve) => {
+        waiting.push(resolve);
+        setTimeout(resolve, timeout * 1000);
+      });
     },
 
     // True when the cube is at its resting angles.

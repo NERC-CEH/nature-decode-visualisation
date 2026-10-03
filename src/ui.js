@@ -24,7 +24,6 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
     back: $('back'),
     next: $('next'),
   };
-  el.note.textContent = SIMULATED_NOTE;
 
   steps.forEach(() => el.progress.appendChild(document.createElement('li')));
 
@@ -59,6 +58,7 @@ export function createUi({ steps, onNext, onBack, onRestart }) {
       el.text.textContent = step.text;
       el.summary.textContent = step.summary ?? '';
       el.canvasWrap.setAttribute('aria-label', step.canvasLabel);
+      el.note.textContent = step.note ?? SIMULATED_NOTE;
       el.note.classList.toggle('is-hidden', isIntro || isFinale);
 
       el.progressLabel.textContent = `Step ${index + 1} of ${steps.length}`;

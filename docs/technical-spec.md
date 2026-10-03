@@ -248,14 +248,16 @@ Every cube is the same object throughout and belongs to one cell (species, time,
 
 ### 7.4 Face views (Insights)
 
-Seen face-on, cubes in a line of sight hide each other. On the current data each face shows 37 to 51 squares for 88 cubes, and about half of them hide two or more. The faces have to show those counts, so:
+Seen face-on, cubes in a line of sight hide each other. On the current data each face shows 37 to 51 squares for 88 cubes (about half of them hiding two or more), so the faces have to show counts. As built:
 
-- **Projection:** after the turn, the camera eases into a near-orthographic view (a dolly zoom: the field of view narrows while the camera backs away, so the framing holds), then switches to a true orthographic camera with no visible jump.
-- **Multiply blending ("tinted Perspex"):** in face views cubes are drawn with multiplicative blending and partial tint. On white, one cube reads light and every cube behind it darkens the cell further. This is independent of draw order, so it is cheap and stable, and it echoes the stacked Perspex sheets of the physical cube.
-- **Species × location** and **species × time:** each row is one species, so overlaps darken that species' own colour.
-- **Location × time:** species collapses, so mixed colours would be meaningless. Cubes cross-fade to a neutral grey tint for this face, and the darkness of a cell shows how many species were recorded there.
-- A small key in the caption bar reads "Darker = more records" during the Insights.
-- Blending switches back to opaque when the cube leaves the face views (Back to Arrange, or on to the finale).
+- **Which face shows what.** The cube is turned (not the camera). Insights 1 is the side face: location across, species up, with time along the line of sight. Insights 2 is the top face: time across (left to right), location up and down, with species along the line of sight. Insights 3 is the front face: time across, species up, with location along the line of sight. Each is a rotation of the cube about its middle: yaw 90° for the side, tilt 90° for the top, none for the front.
+- **Near-orthographic view.** The camera does a dolly zoom: its field of view narrows from 35° to 3° while it backs off from about 32 to about 280 units, which keeps the cube the same size on screen and flattens the picture into a grid. It does not swap to a true orthographic camera, because a swap would jump; at 3° the scale differs by about 2% between the near and far side of the cube. The face fits the view with 45% to spare (`FACE.margin`) for its two titles.
+- **See-through cubes, normal blending.** Cubes become 60% opaque (40% for the grey face), so the more cubes lie along a line of sight the darker the cell: one cube is a light tint, two a stronger one, three or more nearly solid. In the first draft this was multiply blending; ordinary transparency does the job here, because along any line of sight in the two coloured faces the overlapping cubes are of one species (so they have one colour whatever the order), and in the grey face all cubes are the same grey. It can be animated smoothly, which a switch of blending mode cannot.
+- **The grey face.** Species are put together on Insights 2, so mixed colours would mean nothing: the cubes fade to a dark grey (`#333333`) at 40% opacity there, and back to their species colours for Insights 3.
+- **The key.** The caption's footnote reads "Simulated data. Darker means more records." on the three Insight steps.
+- **Axis titles.** The arrow for time and the three titles of the arranged cube fade away; two upright titles that do not turn with the cube take their place, below and to the left of the face: Location and Species, then "Time →" and Location, then "Time →" and Species. The light-grey box stays as a border round the grid.
+- **Drag and snap back.** The cube can still be dragged round; it springs back to its face. Between faces the cube turns by the same spring (about 1.6 s to arrive).
+- **Back** goes to the face before, and from the first face to the arranged cube: the view widens again, the cube turns back to its arranged angle, the cubes become solid and coloured again, and the arrow and titles return.
 
 ### 7.5 Camera and framing
 
@@ -398,7 +400,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M2 (built) | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 (built) | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 (built) | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
-| M5 | **Insights** ×3: turns, orthographic hand-over, face blending, key | Each face shows its claim at a glance. |
+| M5 (built) | **Insights** ×3: turns, dolly zoom to a flat grid, see-through cubes, key | Each face shows its claim at a glance. |
 | M6 | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | M7 | Kiosk mode, reduced motion, no-WebGL fallback, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
 | M8 | Polish, performance, README, NOTICE, GitHub Pages | Runs on the latest Chrome, Edge, Firefox and Safari. Steady 60 fps on an integrated-GPU laptop. |

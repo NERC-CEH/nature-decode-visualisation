@@ -12,7 +12,7 @@ import { tween, ease } from './tween.js';
 const ARROW_COLOUR = '#4D4D4D';
 
 // `parent` is the group the cubes are in; `makeLabel(text)` returns a DOM element for a title.
-export function createFrame({ parent, edge, centreY, makeLabel }) {
+export function createFrame({ parent, staticParent = null, edge, centreY, makeLabel }) {
   const group = new THREE.Group();
   group.visible = false;
   parent.add(group);
@@ -47,33 +47,93 @@ export function createFrame({ parent, edge, centreY, makeLabel }) {
     return { element, object };
   });
 
-  let amount = 0;
+  // The two titles for a face view (the Insights) stay upright whatever angle the cube is at, so they
+  // are placed outside the turning group, beside and below the face as seen from the front.
+  const faceTitles = ['horizontal', 'vertical'].map((role) => {
+    const element = makeLabel('');
+    element.style.opacity = '0';
+    const object = new CSS2DObject(element);
+    object.position.set(...(role === 'horizontal' ? [0, centreY - half - 1.0, 0] : [-half - 1.6, centreY, 0]));
+    staticParent?.add(object);
+    return { role, element, object, text: '' };
+  });
+
+  let amount = 0; // the box and, with the titles, the whole frame
+  let titles = 0; // the arrow and the three axis titles
   let running = null;
+  let titleRunning = null;
+  let faceRunning = null;
 
   function apply() {
-    group.visible = amount > 0.001;
+    group.visible = amount > 0.001 || titles > 0.001;
     lineMaterial.opacity = amount;
-    arrow.line.material.opacity = amount;
-    arrow.cone.material.opacity = amount;
-    for (const { element } of labels) element.style.opacity = String(amount);
+    arrow.line.material.opacity = titles;
+    arrow.cone.material.opacity = titles;
+    for (const { element } of labels) element.style.opacity = String(titles);
   }
 
   return {
     group,
     labels,
+    faceTitles,
     get amount() { return amount; },
-    set amount(value) { amount = value; apply(); },
-    // Fade to `target` (0 = hidden, 1 = shown) over `seconds`.
+    set amount(value) { amount = value; titles = value; apply(); },
+    get titles() { return titles; },
+    // Fade the whole frame (box, arrow and titles) to `target` (0 = hidden, 1 = shown).
     fadeTo(target, seconds) {
       running?.cancel();
+      titleRunning?.cancel();
       const from = amount;
-      if (from === target) return Promise.resolve();
+      const titlesFrom = titles;
+      if (from === target && titlesFrom === target) return Promise.resolve();
       running = tween({
         duration: seconds,
         easing: ease.inOutQuad,
-        onUpdate: (p) => { amount = from + (target - from) * p; apply(); },
+        onUpdate: (p) => {
+          amount = from + (target - from) * p;
+          titles = titlesFrom + (target - titlesFrom) * p;
+          apply();
+        },
       });
       return running.finished.then(() => undefined);
+    },
+    // Fade only the arrow and the three axis titles, leaving the box. The face views use this.
+    fadeTitlesTo(target, seconds) {
+      titleRunning?.cancel();
+      const from = titles;
+      if (from === target) return Promise.resolve();
+      titleRunning = tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (p) => { titles = from + (target - from) * p; apply(); },
+      });
+      return titleRunning.finished.then(() => undefined);
+    },
+    // Show the two upright titles for a face view, changing them if they are already showing
+    // something else. Pass null for either to leave that one hidden.
+    async showFaceTitles(horizontal, vertical, seconds = 0.4) {
+      faceRunning?.cancel();
+      const wanted = { horizontal, vertical };
+      const fades = faceTitles.map((title) => {
+        const text = wanted[title.role];
+        const from = Number(title.element.style.opacity) || 0;
+        const change = text !== title.text;
+        const down = change && from > 0 ? seconds / 2 : 0;
+        return (async () => {
+          if (change && from > 0) {
+            await tween({ duration: down, easing: ease.inOutQuad, onUpdate: (p) => { title.element.style.opacity = String(from * (1 - p)); } }).finished;
+          }
+          title.text = text ?? '';
+          title.element.textContent = title.text;
+          if (!text) { title.element.style.opacity = '0'; return; }
+          const start = Number(title.element.style.opacity) || 0;
+          await tween({ duration: seconds, easing: ease.inOutQuad, onUpdate: (p) => { title.element.style.opacity = String(start + (1 - start) * p); } }).finished;
+        })();
+      });
+      await Promise.all(fades);
+    },
+    hideFaceTitles(seconds = 0.3) {
+      return this.showFaceTitles(null, null, seconds);
     },
   };
 }
