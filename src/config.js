@@ -102,7 +102,8 @@ export const NETWORK = {
 // pull fades out within `heapRadius` of the heap, so the heap spreads into a mound, not a column. The
 // pull builds up over `rampIn` seconds and eases off over `rampOut`. After the main pull, cubes
 // still further than `farRadius` from their heap keep being pulled, for up to `stragglers` more
-// seconds, until no more than `farShare` of the cubes are still on their way. Heaps are spread
+// seconds (so the whole pull lasts 10 s at the most), until no more than `farShare` of the cubes
+// are still on their way. Heaps are spread
 // over `spread` of the floor's width, in two rows: `rowZ` is the middle of the two rows and
 // neighbouring heaps are `zigzag` units either side of it, which gives each heap more room.
 export const SORT = {
@@ -114,8 +115,8 @@ export const SORT = {
   rampIn: 0.4,
   rampOut: 0.6,
   farRadius: 5,
-  farShare: 0.03,
-  stragglers: 2,
+  farShare: 0.01,
+  stragglers: 7,
   spread: 0.88,
   rowZ: 5,
   zigzag: 5,
