@@ -293,18 +293,66 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       });
     },
 
+    // Fly every cube to its cell in the data cube and leave it there, fixed in place (it is no
+    // longer part of the physics). `cells[i]` is the cell for cube i ({ x, y, z }); `sheetOf(i)`
+    // says which sheet it is on (0..sheets-1). Sheets lift off one after another, bottom first,
+    // so every cube is in its cell within `total` seconds, and each flight takes `flight` seconds,
+    // up an arc and turning to sit square in its cell.
+    arrange(cells, sheetOf, sheets, total = DURATIONS.arrange, flight = DURATIONS.arrangeFlight) {
+      steering = null;
+      const random = mulberry32(ARENA.spawnSeed + 23);
+      const stagger = sheets > 1 ? (total - flight) / (sheets - 1) : 0;
+      const flying = [];
+      state.forEach((s, i) => {
+        const body = s.body;
+        const from = body
+          ? { p: { x: body.position.x, y: body.position.y, z: body.position.z }, q: { x: body.quaternion.x, y: body.quaternion.y, z: body.quaternion.z, w: body.quaternion.w } }
+          : s.pose;
+        if (!from) return;
+        if (body) physics.removeCube(body);
+        s.body = null;
+        s.pose = { p: { ...from.p }, q: { ...from.q } };
+        // the cubes of a sheet leave within a tenth of the gap between sheets of each other
+        const delay = sheetOf(i) * stagger * 0.9 + random() * stagger * 0.1;
+        flying.push({ i, from: { p: { ...from.p }, q: { ...from.q } }, to: cells[i], delay, arc: 2 + random() * 2 });
+      });
+      const fromQ = new THREE.Quaternion();
+      const identity = new THREE.Quaternion();
+      return tween({
+        duration: total,
+        easing: ease.linear,
+        onUpdate: (progress) => {
+          const time = progress * total;
+          for (const { i, from, to, delay, arc } of flying) {
+            const local = Math.min(1, Math.max(0, (time - delay) / flight));
+            const e = ease.inOutCubic(local);
+            const pose = state[i].pose;
+            pose.p.x = from.p.x + (to.x - from.p.x) * e;
+            pose.p.y = from.p.y + (to.y - from.p.y) * e + arc * Math.sin(Math.PI * e);
+            pose.p.z = from.p.z + (to.z - from.p.z) * e;
+            fromQ.set(from.q.x, from.q.y, from.q.z, from.q.w).slerp(identity, e);
+            pose.q.x = fromQ.x; pose.q.y = fromQ.y; pose.q.z = fromQ.z; pose.q.w = fromQ.w;
+          }
+          field.sync();
+        },
+      }).finished.then(() => undefined);
+    },
+
     // Cubes rise out of view, one after another, then disappear. Used by Back from the first
     // step. Physics cannot be rewound, so the cubes are lifted by a tween instead.
     liftAway(seconds = DURATIONS.lift) {
       const stagger = seconds * 0.35;
       const lifting = [];
       state.forEach((s, i) => {
-        if (!s.body) return;
-        const p = s.body.position;
-        const q = s.body.quaternion;
-        s.pose = { p: { x: p.x, y: p.y, z: p.z }, q: { x: q.x, y: q.y, z: q.z, w: q.w } };
-        physics.removeCube(s.body);
-        s.body = null;
+        if (s.body) {
+          const p = s.body.position;
+          const q = s.body.quaternion;
+          s.pose = { p: { x: p.x, y: p.y, z: p.z }, q: { x: q.x, y: q.y, z: q.z, w: q.w } };
+          physics.removeCube(s.body);
+          s.body = null;
+        } else if (!s.pose) {
+          return;
+        }
         lifting.push({ i, from: { ...s.pose.p }, delay: ((i * 7919) % count) / count * stagger });
       });
       pending = [];

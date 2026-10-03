@@ -49,6 +49,11 @@ export const DURATIONS = {
   sort: 3.0, // the cubes are pulled into their heaps for this long...
   sortSettle: 0.5, // ...and the step is ready this long after the pull ends
   sortBack: 1.2, // on Back the cubes ease back to where they were
+  arrange: 3.5, // every cube is in its cell within this time: heaps lift one after another...
+  arrangeFlight: 1.5, // ...and each cube takes this long to fly to its cell
+  arrangeFrame: 2.0, // the frame (box, arrow and titles) starts to fade in this long after the lift starts...
+  frameFade: 0.8, // ...and takes this long
+  arrangeBack: 1.5, // on Back the cubes return to their heaps and the camera to the floor
 };
 
 // The floor the cubes fall onto. Sized from the cube count; one world unit is one cube edge.
@@ -122,6 +127,29 @@ export const SORT = {
   zigzag: 5,
 };
 
+// The arranged data cube. `pitch` is the distance between cell centres, so cubes of one unit leave
+// a gap of pitch - 1 between them; `floorGap` is the space under the cube. The camera looks at it
+// from `elevation` degrees above the horizontal, with `margin` times the room it needs. The cube
+// is turned by `yaw` and `tilt` radians (about the vertical and horizontal axes) when it arrives, to
+// show the front and one side; the cube springs back to this when it is let go.
+export const CUBE = {
+  pitch: 1.25,
+  floorGap: 1.5,
+  titleDrop: 4.5, // how far below the cube to leave room for: the arrow and title for time (2.5), and the lowering of the near ones by perspective
+  elevation: 14,
+  margin: 0.88,
+  yaw: -0.55,
+  tilt: 0.05,
+};
+
+// Dragging the cube: radians turned per pixel dragged, the furthest it can tilt, and the stiffness
+// of the spring that returns it (larger is faster; the spring is critically damped).
+export const ROTATE = {
+  sensitivity: 0.008,
+  maxPitch: 1.3,
+  spring: 9,
+};
+
 // Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.
 export const CAMERA = {
   elevation: 10,
@@ -141,7 +169,7 @@ export const SIMULATED_NOTE = 'Simulated data.';
 export const TAGLINE = 'Our planet. Decoded.';
 
 // One entry per step, in order. `theme` is the page colour for that step.
-// `repel` marks steps where the cursor pushes the cubes. `canvasLabel` describes the 3D scene
+// `repel` marks steps where the cursor pushes the cubes, and `rotate` those where the cube can be dragged round. `canvasLabel` describes the 3D scene
 // for screen readers. `summary` is the plain-text description of the pattern an Insight shows.
 export const STEPS = [
   {
@@ -178,6 +206,7 @@ export const STEPS = [
   {
     id: 'arrange',
     title: 'Arrange',
+    rotate: true,
     text: 'We place each record in a cube with three axes: species, location and time. Each species is one sheet. A data cube is a stack of spreadsheets, one on top of another.',
     theme: 'light',
     canvasLabel: 'The cubes arrange into a three-dimensional data cube with axes for species, location and time. Drag to rotate it.',
@@ -185,6 +214,7 @@ export const STEPS = [
   {
     id: 'insight1',
     title: 'Insights',
+    rotate: true,
     text: 'Species by location. Generalist species occur in many locations. Specialist species occur in few, because they depend on particular habitats.',
     theme: 'light',
     insight: 1,
@@ -194,6 +224,7 @@ export const STEPS = [
   {
     id: 'insight2',
     title: 'Insights',
+    rotate: true,
     text: 'Location by time. Records grow over time across locations, as more people record wildlife with smartphone apps.',
     theme: 'light',
     insight: 2,
@@ -203,6 +234,7 @@ export const STEPS = [
   {
     id: 'insight3',
     title: 'Insights',
+    rotate: true,
     text: 'Species by time. Overall recording rises, yet specialist records fall. That pattern points to a decline.',
     theme: 'light',
     insight: 3,

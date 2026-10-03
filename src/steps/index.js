@@ -7,6 +7,7 @@ import { wait } from '../tween.js';
 import { dataStep } from './data.js';
 import { categoriseStep } from './categorise.js';
 import { sortStep } from './sort.js';
+import { arrangeStep } from './arrange.js';
 
 const PLACEHOLDER_PAUSE = 0.4; // seconds
 
@@ -14,6 +15,7 @@ const built = {
   data: dataStep,
   categorise: categoriseStep,
   sort: sortStep,
+  arrange: arrangeStep,
 };
 
 export function buildSteps(configSteps) {

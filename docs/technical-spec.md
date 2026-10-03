@@ -198,7 +198,7 @@ Generator tasks (M0):
 | Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 2 s, ramping up for the first second and down for the last. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
 | Data → Categorise | Random-order recolour, 2 s total, each cube 0.3 s | Recolour to black, 1 s |
 | Categorise → Sort | Cubes are pulled to their heap spots and pile up, 3 s, plus up to 7 s for stragglers (10 s at the most) | Ease to the Categorise snapshot, 1.2 s |
-| Sort → Arrange | Each heap rises in turn and spreads into its sheet, 3.5 s | Ease to the Sort snapshot, 1.5 s |
+| Sort → Arrange | Each heap lifts in turn and its cubes fly into their sheet of the cube, 3.5 s in all | Ease to the Sort snapshot, 1.5 s |
 | Arrange → Insight 1 → 2 → 3 | Cube rotation plus camera change, 1.5 s each | Same, reversed |
 | Insight 3 → Finale | Background eases from white to black while the cubes fly to the logo dots (3 s), then the lock-up fades in (1 s) | Same, reversed |
 
@@ -397,7 +397,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M1 (built) | **Data**: drop, floor, walls, shadows, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
 | M2 (built) | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 (built) | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
-| M4 | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
+| M4 (built) | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
 | M5 | **Insights** ×3: turns, orthographic hand-over, face blending, key | Each face shows its claim at a glance. |
 | M6 | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | M7 | Kiosk mode, reduced motion, no-WebGL fallback, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
@@ -422,6 +422,16 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - The release rate ramps up over the first second and down over the last (`DURATIONS.dropRamp`, 1 s), so the stream starts and tails off like a pour. The release lasts 2 s (`DURATIONS.drop`), so the two ramps meet and the flow is a triangle that peaks at 1 s at about 164 cubes a second. The default cube has released 1, 7, 20, 46 and 82 cubes by 0.1, 0.3, 0.5, 0.75 and 1 s, and 159 by 1.75 s. A drop longer than twice the ramp leaves a steady flow between the ramps; a ramp longer than half the drop is cut to half. (An earlier version dropped the cubes in 1 s with 0.5 s ramps, which made the stream wider because the lanes are sized for the peak rate.) The lanes are sized for the peak rate, so no cube starts inside another.
 
 - The pour varies at random (`STREAM.variation`, 0.5): the release rate and the width of the stream each wander by up to 50% either way, on slow cycles of roughly half a second to two seconds, on top of the ramps. The width is the number of lanes in use, taken from the inside of the spiral outward, so the stream's area really does change by up to 50%. The release time of each cube is read from the tabulated, randomised flow. When the stream is narrow and the flow is high, a cube waits for a free lane (so no cube is ever released inside another), which flattens the peaks a little and makes the pour end up to about 0.6 s after its planned time. Up to 50% more lanes than the plain pour need are available, so the widest the stream gets is about 5 units from the middle for 164 cubes. Everything is seeded, so a given data file always pours the same way. For the default cube, cubes released in successive 0.2 s windows run 4, 11, 12, 19, 41, 23, 21, 21, 9, 3, using 4 to 14 lanes.
+
+### M4 as built
+
+- **Layout** (`src/layout.js`): time runs left to right, species up (display order, so the most widespread species is the bottom sheet and the specialists the top two), location front to back. Cells are 1.25 units apart, so cubes of one unit leave a gap of a quarter of a unit, and the cube floats with its bottom 1.5 units above the floor. Every cube has its own cell (checked by a test).
+- **The flight** (`field.arrange`): the heaps lift one after another, bottom sheet first, so every cube is in its cell within 3.5 s; each cube takes 1.5 s, up a 2 to 4 unit arc, turning to sit square. In the cells the cubes are fixed in place and no longer part of the physics (the physics world has no bodies in it). All 164 cubes were within 0.001 units of their cells in the browser.
+- **Camera** (`scene.setView`): the camera rises from the floor view (10° above horizontal) to a cube view at 14° over the 3.5 s, looking at a point a little below the middle of the cube so the time arrow and its title fit under it. The size of the cube on screen is the room the cube and the frame need (`CUBE.margin`).
+- **The frame** (`src/frame.js`): a light-grey wireframe box, an arrow for the direction of time along the front, and titles for Time, Species and Location. It fades in from 2 s, as the last heaps are arriving. There are no species names or tick numbers. The shadows on the floor fade out as the cubes lift, because the arranged cube floats in space.
+- **Rotation** (`src/rotate.js`): drag to turn the cube about its middle (yaw and tilt, tilt limited to 75°). There is no zoom. On letting go a critically damped spring returns it to the angle the step wants, 0.55 radians round and 0.05 tilted, which shows the front and the right-hand side. It springs back the short way if turned more than a half turn, and the spring is solved exactly, so it is steady at any frame rate. In the browser, a drag of 240 px turned it 1.9 radians, and 2.5 s after letting go it was back at rest. Dragging works only on the Arrange and Insight steps (`rotate` in `config.js`); the cursor does not push cubes there.
+- **Back:** the frame fades out, the cube turns square, the camera returns to the floor and the cubes ease back to the places and poses they had when Sort ended (1.5 s), where physics takes over again. 164 of 164 cubes returned.
+- A first attempt at the camera framing used a sphere round the middle of the cube and clipped the time arrow off the bottom of the screen. The camera now looks lower down (`CUBE.titleDrop`).
 
 ### M3 as built
 
