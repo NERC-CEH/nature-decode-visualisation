@@ -63,7 +63,7 @@ src/
   controller.js         step state machine, snapshots, kiosk timer
   data.js               reads window.DATA_CUBE, derives cube list, display order, layouts
   scene.js              renderer, cameras, lights, shadow floor, resize
-  cubes.js              InstancedMesh, per-instance colour, edge shader, blending modes
+  cubes.js              InstancedMesh, per-instance colour, blending modes
   physics.js            cannon-es world, floor, walls, cursor repulsion, headless settle
   rotate.js             drag-to-rotate of the cube group, spring back
   labels.js             axis titles and time arrow
@@ -144,7 +144,7 @@ The layout follows the sketches: the 3D scene above a caption bar.
 - **Background and text:** steps 1 to 7 use a white background (`#FFFFFF`) with black text (`#000000`). The intro and the finale use a black background with white text. Either pairing gives 21:1 contrast. The page background, caption bar, buttons, focus ring and canvas clear colour all switch together, through one CSS variable that the controller tweens (so the DOM and the 3D scene always match).
 - **Arial:** step title in bold, narration in regular, "Simulated data." as a smaller footnote. Type is never stretched, squashed or over-tracked.
 - Cubes are lit by a soft hemisphere light plus one directional key light. A shadow-only floor (`ShadowMaterial`) gives soft contact shadows, so cubes sit on the white page instead of floating. The floor itself is invisible.
-- Each cube has a thin dark edge (7.6), so pale species colours stay visible on white.
+- Cubes have no outline: they are plain shaded boxes, and the lighting alone shows their shape (an outline was tried and removed at review, because it looked wrong as each cube took its colour).
 - Tone: short sentences, decisive, no hedging, no exclamation marks, no capitals except acronyms.
 
 ## 5. Data
@@ -266,7 +266,7 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 ### 7.6 Rendering
 
 - One `InstancedMesh` for all cubes, with per-instance colour and opacity. Matrices are copied from the physics bodies each frame while physics runs.
-- **Cube edges:** lines cannot be instanced cheaply, so edges are drawn in the cube's fragment shader instead. `MeshStandardMaterial` is patched with `onBeforeCompile` to darken pixels near each face's UV border. This costs one draw call for every cube.
+- **No cube outlines:** a darker edge drawn in the cube shader was tried in M1 and removed at M2 review. Cubes are plain `MeshStandardMaterial` boxes.
 - Bounding box: `EdgesGeometry`, `#B3B3B3`, 1 px.
 - Pixel ratio capped at 2. Antialiasing on. Shadow map 1024 px, from the key light only.
 - The cube geometry carries a morph target to a sphere for the finale (7.7).
@@ -367,7 +367,7 @@ From the brand palette by exhaustive search. Every nine-colour subset of the 15 
 
 - The worst pair is clay and pale green under deuteranopia, ΔE 13.7, which is above the roughly 10 needed to tell colours apart side by side.
 - The specialists get the two most distinct colours, because the Insights follow them.
-- Pale colours are rescued by the dark cube edges (7.6). Check on a projector during review.
+- Pale colours are the weakest on white; the shading and the soft shadows keep their shape readable. Check on a projector during review.
 - Colour is never the only cue. Species are also separated by heap (Sort) and by sheet (Arrange and Insights).
 - The palette is an ordered list in `config.js`. `check-palette.mjs` reruns the ΔE and contrast checks if the palette changes.
 
@@ -394,7 +394,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | Milestone | Content | Done when |
 |---|---|---|
 | M0 (built) | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
-| M1 (built) | **Data**: drop, floor, walls, shadows, edge shader, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
+| M1 (built) | **Data**: drop, floor, walls, shadows, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
 | M2 (built) | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
 | M4 | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
@@ -408,7 +408,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 
 - The floor is sized from the cube count at 6 square units per cube, 1.5 : 1 wide (about 37 × 25 units for 164 cubes), so the cubes read as small. The camera is fitted to it at any window shape, and cubes are released from just above the top of the view. The view is then lowered so the floor sits one third of the way up the screen.
 - Cubes pour into the middle of the floor as a stream. They are released down several side-by-side lanes (a sunflower spiral, 1.25 units apart) at 28 units/s, so no cube starts inside another: cubes in one lane are at least 1.8 apart at release, and the number of lanes follows the cube count (11 lanes for 164 cubes). Release order, spin and sideways drift are seeded, so a given data file always drops the same way. If a frame is slow, cubes released during it start part-way down their fall, so the stream stays smooth. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
-- Each cube has a thin darker edge drawn in its own shader (a darker version of its own colour), and the floor shows only the soft shadows. Cubes start near-black (`#111111`), not pure black, so the lighting still shows their shape.
+- The floor shows only the soft shadows (cubes had a thin darker edge at first; it was removed in M2). Cubes start near-black (`#111111`), not pure black, so the lighting still shows their shape.
 - Repulsion was tuned in a simulation (a resting cube next to a stationary cursor is driven out to the edge of the cursor's reach, about 6 units; a quick sweep nudges it 1 to 5 units). Final values are set by eye at review.
 - `?debug` on the page address exposes the app as `__dataCube` in the browser console, for testing.
 - Verified in Edge from `file://`: 164 cubes released, all settle inside the walls; repulsion pushes only nearby cubes; Back lifts everything away and the cubes drop again on Next. Headless software rendering ran at 19 fps, so the 60 fps target still needs checking on a real GPU.
@@ -428,8 +428,11 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 - Each cube takes its species colour (from the palette in `config.js`, by species id) at its own random moment: every cube's start time is drawn at random (seeded, so the order is the same every time) and the whole sweep finishes within 2 s, each cube taking 0.3 s over its own change with an ease in and out. Cubes stay where they are and keep tumbling if still moving, and the cursor still pushes them.
 - Back drains the colours to near-black within 1 s, the same way, and only that: the cubes stay where they are.
 - The colour of every cube is part of the snapshot taken on leaving the step, as the spec requires.
-- The species colours are clearly distinct on white. The palest (pale green and sky) are the weakest against the page; the thin darker edge keeps their outlines readable. This still needs checking on a projector.
+- The species colours are clearly distinct on white. The palest (pale green and sky) are the weakest against the page; the shading keeps their shape readable. This still needs checking on a projector.
 - `?debug` also exposes `speciesColour`, so a slow-motion version of the step can be run for screenshots.
+
+- The thin dark edges are removed (they looked wrong as each cube gained its colour). Cubes are plain shaded boxes.
+- **Popcorn:** as each cube takes its colour it gets a brief push, the cursor's own push (`REPEL`) in a random direction (one per cube, seeded), rising and falling over the 0.3 s of its change. At 20% of the cursor's power it did nothing: a cube at rest needs about 10% before it moves at all, and friction swallows the rest. A simulation of a resting cube pushed for 0.3 s found 50% slides it about 1 unit with a 0.2 unit hop, 55% slides it about 2.2 units (a fifth of the 11.5 units that the cursor at full strength gives over the same time), and 70% about 6 units. `POP.power` is set to 0.55. In the browser, 70 of 164 cubes moved more than 0.3 units during the step (42 more than 1 unit, the most 3.2 units), against 6 (none more than 1 unit) with the push turned off. There is no push on Back.
 
 ### M0 as built
 
@@ -456,7 +459,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | Physics cannot be rewound | Snapshots and eased returns (6.1). |
 | Heaps jitter or collapse in cannon-es | Sleeping, tuned friction, speed cap. Rapier compat behind the same `physics.js` interface. |
 | Faces hide counts | Multiply blending (7.4). Check on the projections (8.1). |
-| Pale species colours on white | Edge shader, contact shadows, projector check. |
+| Pale species colours on white | Shading, soft shadows, projector check. |
 | Tagline contrast on white | Black background for the intro and finale (9.2). |
 | Stale committed bundle | CI staleness check (3.3). |
 | `file://` limits | No runtime `fetch` or module imports. The data is a script file. |

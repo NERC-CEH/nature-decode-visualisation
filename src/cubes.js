@@ -1,36 +1,17 @@
 // The cubes: one InstancedMesh for every record, each tied to a physics body once it has been
 // dropped. Cubes keep their identity through every step (technical-spec 7).
 //
-// A thin dark edge is drawn in the fragment shader, so every cube has an outline for one draw
-// call. The edge darkens the cube's own colour, so black cubes stay black and pale species
-// colours keep a visible outline against white.
+// Cubes are plain shaded boxes with no outline: the lighting alone shows their shape.
 
 import * as THREE from 'three';
 import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
 import { ARENA, DURATIONS, PHYSICS } from './config.js';
 import { mulberry32 } from './random.js';
+import { pop } from './repulsion.js';
 
-const EDGE_WIDTH = 0.045; // fraction of a cube face, on each side
-const EDGE_DARKEN = 0.55;
 export const START_COLOUR = '#111111'; // near-black, so lighting still shows the cube's shape
 const LIFT_HEIGHT = 40; // how far cubes rise when they leave
-
-function edgeMaterial() {
-  const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 });
-  material.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vEdgeUv;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdgeUv = uv;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vEdgeUv;')
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        vec2 edgeDistance = min(vEdgeUv, 1.0 - vEdgeUv);
-        float edgeLine = 1.0 - smoothstep(${EDGE_WIDTH.toFixed(3)}, ${(EDGE_WIDTH * 2).toFixed(3)}, min(edgeDistance.x, edgeDistance.y));
-        diffuseColor.rgb *= 1.0 - ${EDGE_DARKEN.toFixed(2)} * edgeLine;`);
-  };
-  return material;
-}
 
 // The shadow a cube casts fades in as it falls: none at the release height, full strength once it
 // is within SHADOW_FULL of the floor. The shadow map has no transparency, so each cube's shadow
@@ -69,7 +50,7 @@ function shadowDepthMaterial(getFadeTop) {
 // above the visible frame to release cubes from.
 export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () => 20 }) {
   const count = cubes.length;
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), edgeMaterial(), count);
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }), count);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   const shadowMaterial = shadowDepthMaterial(() => getSpawnY());
@@ -188,26 +169,36 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     // Every cube changes to the colour `targetOf(i)` returns, each at its own random moment, so the
     // change sweeps over the cubes in no order. All are done within `total` seconds and each
     // takes `each` seconds over its own change. The order is the same every time.
-    recolour(targetOf, total = DURATIONS.categorise, each = DURATIONS.categoriseEach) {
+    // With \`popPower\` above zero each cube also gets a brief push while it changes (see POP).
+    recolour(targetOf, total = DURATIONS.categorise, each = DURATIONS.categoriseEach, popPower = 0) {
       recolouring?.cancel();
       const random = mulberry32(ARENA.spawnSeed + 11);
       const from = [];
       const to = [];
       const start = [];
+      const angle = [];
       for (let i = 0; i < count; i++) {
         mesh.getColorAt(i, colour);
         from.push(colour.clone());
         to.push(new THREE.Color(targetOf(i)));
         start.push(random() * Math.max(0, total - each));
+        angle.push(random() * 2 * Math.PI);
       }
+      let last = 0;
       recolouring = tween({
         duration: total,
         easing: ease.linear,
         onUpdate: (progress) => {
           const time = progress * total;
+          const frame = Math.min(0.1, time - last);
+          last = time;
           for (let i = 0; i < count; i++) {
             const local = each > 0 ? Math.min(1, Math.max(0, (time - start[i]) / each)) : 1;
             mesh.setColorAt(i, colour.copy(from[i]).lerp(to[i], ease.inOutQuad(local)));
+            // a push that rises and falls over the moment of the change
+            if (popPower > 0 && local > 0 && local < 1 && state[i].body) {
+              pop(state[i].body, angle[i], popPower * Math.sin(Math.PI * local), frame);
+            }
           }
           mesh.instanceColor.needsUpdate = true;
         },

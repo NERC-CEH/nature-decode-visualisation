@@ -5,7 +5,7 @@ import { arenaSize } from '../src/arena.js';
 import { createPhysics } from '../src/physics.js';
 import { createCubeField, START_COLOUR } from '../src/cubes.js';
 import { categoriseStep } from '../src/steps/categorise.js';
-import { PALETTE, speciesColour } from '../src/config.js';
+import { PALETTE, POP, speciesColour } from '../src/config.js';
 import { loadCube } from '../src/data.js';
 import { readFileSync } from 'node:fs';
 
@@ -93,4 +93,59 @@ test('capture records the colours so a step can be returned to', async () => {
   await field.recolour((i) => speciesColour(cube.cubes[i].species), 0.05, 0.02);
   const snapshot = field.capture();
   assert.equal(snapshot[0].colour, hex(PALETTE[cube.cubes[0].species]));
+});
+
+// ---- popcorn: a brief push as each cube takes its colour -------------------------------
+async function settledField() {
+  const arena = arenaSize(cube.cubes.length);
+  const physics = createPhysics();
+  physics.setBounds(arena.width, arena.depth);
+  const field = createCubeField({ scene: new THREE.Scene(), physics, cubes: cube.cubes, arena });
+  const dropped = field.drop(0.4, 0, 0);
+  for (let f = 0; f < 90; f++) field.tick(1 / 60);
+  await dropped;
+  physics.settle(600);
+  return { field, physics };
+}
+const positions = (physics) => physics.bodies.map((b) => [b.position.x, b.position.y, b.position.z]);
+const target = (i) => speciesColour(cube.cubes[i].species);
+
+async function movedBy(popPower) {
+  const { field, physics } = await settledField();
+  const before = positions(physics);
+  await field.recolour(target, 0.5, 0.2, popPower);
+  for (let f = 0; f < 120; f++) physics.world.step(1 / 60); // let the hops and slides finish
+  const after = positions(physics);
+  const moves = before.map((p, i) => Math.hypot(...p.map((v, k) => v - after[i][k])));
+  return { moved: moves.filter((d) => d > 0.3).length, largest: Math.max(...moves) };
+}
+
+test('with a pop the cubes stir as they take their colour; without, they hardly do', async () => {
+  const still = await movedBy(0);
+  const popped = await movedBy(POP.power);
+  // some cubes are still settling after the drop, so a few move even with no pop
+  assert.ok(popped.moved > still.moved * 3 && popped.moved > cube.cubes.length * 0.2,
+    `with a pop ${popped.moved} cubes moved more than 0.3 units; without, ${still.moved}`);
+  assert.ok(popped.largest < 12, `none flew off (largest move ${popped.largest.toFixed(1)} units)`);
+});
+
+test('the pop leaves the cubes inside the arena', async () => {
+  const { field, physics } = await settledField();
+  await field.recolour(target, 0.4, 0.15, POP.power);
+  for (let f = 0; f < 200; f++) physics.world.step(1 / 60);
+  const arena = arenaSize(cube.cubes.length);
+  for (const b of physics.bodies) {
+    assert.ok(Math.abs(b.position.x) <= arena.width / 2 && Math.abs(b.position.z) <= arena.depth / 2);
+    assert.ok(b.position.y > 0.3);
+  }
+});
+
+test('the categorise step pops the cubes on the way in and not on the way back', async () => {
+  const calls = [];
+  const fakeField = { recolour: (fn, total, each, power) => { calls.push({ total, each, power }); return Promise.resolve(); } };
+  await categoriseStep.enter({ cube, field: fakeField });
+  await categoriseStep.reverse({ cube, field: fakeField });
+  assert.equal(calls[0].power, POP.power);
+  assert.ok(calls[0].power > 0);
+  assert.ok(!calls[1].power, 'no pop when the colour drains away');
 });

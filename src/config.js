@@ -67,6 +67,15 @@ export const STREAM = {
   variation: 0.5, // the release rate and the width (area) of the stream each vary by up to this share
 };
 
+// When a cube takes its species colour it gets a brief push, like a kernel of popcorn going off:
+// the cursor's push (REPEL) in a random direction, at this share of its power, rising and falling
+// over the moment the colour changes. A resting cube needs a push of more than about 10% of the
+// cursor's before it moves at all, and 20% of it does nothing visible; 0.55 slides a cube about
+// two units, which is a fifth of what the cursor at full strength does over the same time.
+export const POP = {
+  power: 0.55,
+};
+
 // The network of wireframe cubes behind the title on the opening screen. It hangs this many
 // units in front of the camera. Sway is how far each cube drifts (as a share of the view), cycle
 // is the length in seconds of a slow sway, and turn is how far the whole cloud rocks, in radians.
