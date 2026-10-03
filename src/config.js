@@ -53,6 +53,11 @@ export const ARENA = {
   spawnSeed: 1, // spawn positions repeat for a given data file
 };
 
+// Camera for the floor steps: how far above horizontal it looks down, in degrees.
+export const CAMERA = {
+  elevation: 10,
+};
+
 // Cursor repulsion (technical-spec 7.1). Accelerations are per second, so the push is the same at
 // any frame rate. A cube at rest needs a push of more than about 12 (friction) to start moving.
 export const REPEL = {

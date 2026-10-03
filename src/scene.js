@@ -2,8 +2,10 @@
 // page can fall back to text only (technical-spec 11).
 
 import * as THREE from 'three';
+import { CAMERA } from './config.js';
 
-const ELEVATION = new THREE.Vector3(0, 0.8, 1).normalize(); // camera direction: raised three-quarter view
+const angle = (CAMERA.elevation * Math.PI) / 180;
+const ELEVATION = new THREE.Vector3(0, Math.sin(angle), Math.cos(angle)); // from the target towards the camera
 const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
 
 export function createScene(container) {
@@ -72,9 +74,8 @@ export function createScene(container) {
 
     // Release height: cubes start just above the top of the view, over the nearest edge of the
     // floor, which is the lowest part of the frame at any given height.
-    // (Points higher than the camera itself would project upside down, so search below it.)
     let low = 1;
-    let high = Math.max(2, camera.position.y - 2);
+    let high = camera.position.distanceTo(target) * 4;
     for (let i = 0; i < 30; i++) {
       const mid = (low + high) / 2;
       corner.set(width / 2, mid, depth / 2).project(camera);

@@ -258,7 +258,7 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 
 ### 7.5 Camera and framing
 
-- Perspective camera at a 35° field of view for steps 0 to 4. Steps 0 to 3 use a raised three-quarter view of the floor. Arrange keeps the three-quarter view, raised to the height of the cube.
+- Perspective camera at a 35° field of view for steps 0 to 4. Steps 0 to 3 look at the floor from a low angle, 10° above horizontal (`CAMERA.elevation` in `config.js`, changed from an earlier 38° raised view at review). Arrange raises the camera to the height of the cube.
 - Framing is fitted from the bounding sphere of the active content (floor area or cube) and the viewport aspect, so every size from 5 to 12 fits, with the caption bar subtracted.
 - The camera eases between keyframes. The user never moves the camera directly.
 
