@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data cube preview</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f4f0; font-family: system-ui, sans-serif; color: #222; overflow: hidden; }
+  canvas { display: block; }
+  .tick { font-size: 11px; color: #555; }
+  .title { font-size: 14px; font-weight: 600; color: #111; background: rgba(255,255,255,.7); padding: 1px 6px; border-radius: 4px; }
+  #ui { position: fixed; top: 12px; left: 12px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 24px); }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #888; background: #fff; border-radius: 6px; cursor: pointer; }
+  button.on { background: #222; color: #fff; }
+  #info { position: fixed; bottom: 12px; left: 12px; font-size: 13px; background: rgba(255,255,255,.8); padding: 8px 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<div id="info"></div>
+<script>window.CUBE = /*DATA*/;</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const cube = window.CUBE, n = cube.meta.size;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(n * 1.6, n * 1.1, n * 1.8);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, { position: 'fixed', top: '0', left: '0', pointerEvents: 'none' });
+document.body.appendChild(labelRenderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(5, 10, 7);
+scene.add(sun);
+
+// x = year, y = species, z = habitat
+const offset = (n - 1) / 2;
+const box = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(n, n, n)),
+  new THREE.LineBasicMaterial({ color: 0x555555 }));
+scene.add(box);
+
+const items = [];
+cube.data.forEach((layer, s) => layer.forEach((row, y) => row.forEach((v, h) => { if (v) items.push({ s, y, h }); })));
+const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ roughness: 0.5 }), items.length);
+const m = new THREE.Matrix4(), col = new THREE.Color();
+const speciesColour = (s) => col.setHSL(s / n, 0.7, 0.5).clone();
+let colourBySpecies = true;
+function paint() {
+  items.forEach((it, i) => mesh.setColorAt(i, colourBySpecies ? speciesColour(it.s) : col.set(0x111111)));
+  mesh.instanceColor.needsUpdate = true;
+}
+items.forEach((it, i) => { m.setPosition(it.y - offset, it.s - offset, it.h - offset); mesh.setMatrixAt(i, m); });
+paint();
+scene.add(mesh);
+
+// Axis labels: year along the bottom front edge, species up the front-left edge, habitat along the bottom-left edge
+const half = n / 2, gap = 0.9;
+function label(text, cls, x, y, z) {
+  const el = document.createElement('div'); el.className = cls; el.textContent = text;
+  const o = new CSS2DObject(el); o.position.set(x, y, z); scene.add(o);
+}
+for (let i = 0; i < n; i++) {
+  const c = i - offset;
+  label(i + 1, 'tick', c, -half - gap, half + gap);
+  label(i + 1, 'tick', -half - gap, c, half + gap);
+  label(i + 1, 'tick', -half - gap, -half - gap, c);
+}
+label('Year →', 'title', 0, -half - gap * 2.6, half + gap);
+label('Species →', 'title', -half - gap * 2.8, 0, half + gap);
+label('Habitat →', 'title', -half - gap, -half - gap * 2.6, 0);
+
+// UI
+const ui = document.getElementById('ui');
+function btn(label, fn, toggle) {
+  const b = document.createElement('button'); b.textContent = label;
+  b.onclick = () => { fn(b); if (toggle) b.classList.toggle('on', toggle.state()); };
+  ui.appendChild(b); return b;
+}
+const rot = btn('Auto-rotate', () => controls.autoRotate = !controls.autoRotate, { state: () => controls.autoRotate }); rot.classList.add('on');
+const col_ = btn('Species colours', () => { colourBySpecies = !colourBySpecies; paint(); }, { state: () => colourBySpecies }); col_.classList.add('on');
+const d = n * 3;
+const face = (label, p) => btn(label, () => { controls.autoRotate = false; rot.classList.remove('on'); camera.position.set(...p); });
+face('Year × species (front)', [0, 0, d]);
+face('Species × habitat (side)', [d, 0, 0]);
+face('Year × habitat (top)', [0, d, 0.001]);
+document.getElementById('info').textContent =
+  `${n}×${n}×${n} cube, ${items.length} observations. x = year, y = species, z = habitat. Drag to rotate, scroll to zoom.`;
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); labelRenderer.render(scene, camera); });
+</script>
+</body>
+</html>
