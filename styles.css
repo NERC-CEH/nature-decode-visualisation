@@ -1,0 +1,212 @@
+/* Page colours are CSS variables that the page script eases between the light page (steps 1 to 7)
+   and the dark page (intro and finale). They start dark, like the intro. */
+:root {
+  --bg: #000000;
+  --fg: #FFFFFF;
+  --muted: #BFBFBF;
+  --line: #4D4D4D;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Stage: the 3D canvas, the intro text over it, and status messages */
+.stage {
+  position: relative;
+  min-height: 0;
+}
+.canvas-wrap {
+  position: absolute;
+  inset: 0;
+}
+.canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hero {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.is-intro .hero { opacity: 1; }
+.hero h1 {
+  margin: 0 0 0.25em;
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  line-height: 1.1;
+}
+.hero p {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+}
+
+.status {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 24px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  color: var(--fg);
+}
+.status[hidden] { display: none; }
+
+/* Caption bar */
+.caption {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.caption-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.caption-main { min-width: 0; max-width: 62rem; min-height: 6.25rem; }
+.caption-body {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 8px 24px;
+  align-items: baseline;
+  min-height: 4.5rem; /* fixed bar height, so the 3D view does not resize between steps */
+}
+.caption-body h2 {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+.caption-body #caption-text {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin: 0;
+  max-width: 46rem;
+  min-height: 3em; /* three lines, so the bar does not jump between steps */
+}
+.note {
+  margin: 8px 0 0 calc(9rem + 24px);
+  height: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.note.is-hidden { visibility: hidden; }
+.insight-indicator {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.insight-indicator[hidden] { display: none; }
+.insight-indicator .current { color: var(--fg); font-weight: bold; }
+
+/* Intro: the hero text carries the message, so the caption text is for screen readers only */
+.is-intro .caption-body {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.caption-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex: none;
+}
+.progress {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.progress li {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--fg);
+}
+.progress li.done { background: var(--fg); }
+
+.buttons { display: flex; gap: 12px; }
+button {
+  min-width: 6.5rem;
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 2px solid var(--fg);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+button[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.noscript { padding: 24px; }
+
+@media (max-width: 760px) {
+  .caption { padding: 12px 16px 16px; }
+  .caption-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .caption-body { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .caption-body #caption-text { grid-column: 1; grid-row: auto; min-height: 0; }
+  .insight-indicator { grid-column: 1; grid-row: auto; }
+  .note { margin-left: 0; }
+  .caption-controls { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  button { min-width: 5rem; padding: 8px 14px; }
+  .progress { gap: 4px; }
+  .progress li { width: 12px; height: 12px; }
+}

@@ -49,7 +49,7 @@ Navigation is **Next** and **Back** only. Each press plays an animation forward 
 - **Three.js** for rendering. Pinned to an exact version.
 - **cannon-es** for physics. It is pure JavaScript, so offline and `file://` use stays simple. All physics goes through `physics.js`, so it can be swapped for Rapier's `compat` build, which embeds its WASM, if heaps prove unstable.
 - **Plain JavaScript** ES modules in `src/`. No TypeScript, no framework.
-- **esbuild** bundles `src/` into one classic (IIFE) script, `dist/app.js`. The built file is committed. Opening `index.html` by double-click needs this: browsers block ES-module imports and `fetch` of local files under `file://`, but allow a classic `<script src>`.
+- **esbuild-wasm** (the WebAssembly build of esbuild, so no native binary: the native `esbuild.exe` is blocked from starting on this machine) bundles `src/` into one classic (IIFE) script, `dist/app.js`. The built file is committed. Opening `index.html` by double-click needs this: browsers block ES-module imports and `fetch` of local files under `file://`, but allow a classic `<script src>`.
 - **Animation:** a small in-house tween helper (`tween.js`, about 60 lines, with easing functions). It avoids another dependency and gives exact control over reversing.
 - Node 20 or later and npm are the only tools needed. Both are already used for the data generator.
 
@@ -68,6 +68,7 @@ src/
   rotate.js             drag-to-rotate of the cube group, spring back
   labels.js             axis titles and time arrow
   tween.js              tween and easing helpers
+  theme.js              light/dark page theme, eased as one value
   steps/                one module per step (data, categorise, sort, arrange, insight, finale),
                         each exporting enter(), exit() and reverse()
   ui.js                 caption bar, buttons, progress, live region
@@ -309,9 +310,9 @@ The default cube (9³, seed 42) does not yet support the copy:
 | Face | Assertion |
 |---|---|
 | Species × location | At least two species occupy two-thirds or more of locations. Each specialist occupies at most one habitat band. |
-| Location × time | Records summed over species rise across time: a positive Spearman correlation of at least 0.8 between time and records, and the last third has at least 1.5× the records of the first third. |
+| Location × time | Every time step and location has at least one record. Records summed over species rise across time: a positive Spearman correlation of at least 0.8 between time and records, and the last third has at least 1.5× the records of the first third. |
 | Species × time | Total records rise (as above). Specialist records in the last third total zero. Specialist records in the first third total at least 4. |
-| Whole cube | Cube count within the target range (5.3). |
+| Whole cube | Cube count is between 15% and 28% of cells (5.3). Every species has at least one record. |
 
 Some random iterations do not tell the story, so the check is essential. `npm run data` refuses to write data that fails, and `--seed auto` tries iterations until one passes (5.1). A fixed seed that fails is reported with the assertions it broke. The copy stays fixed while the data changes.
 
@@ -350,7 +351,7 @@ From the brand palette by exhaustive search. Every nine-colour subset of the 15 
 | 6 | `#67CCEA` sky | 1.8 |
 | 7 | `#D7B7AA` clay | 1.9 |
 | 8 | `#CBE0AB` pale green | 1.4 |
-| 9 to 11 | `#DB1F26`, `#4DB264`, `#F5ED5A` | sizes 10 to 12 only. Separation is weaker. |
+| 9 to 11 | `#DB1F26`, `#F5ED5A`, `#CFBCD5` | sizes 10 to 12 only, chosen to keep the smallest difference as large as possible (ΔE 8.6 across all 12). |
 
 - The worst pair is clay and pale green under deuteranopia, ΔE 13.7, which is above the roughly 10 needed to tell colours apart side by side.
 - The specialists get the two most distinct colours, because the Insights follow them.
@@ -380,7 +381,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 
 | Milestone | Content | Done when |
 |---|---|---|
-| M0 | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
+| M0 (built) | Generator changes, `check-story` with seed search, `check-palette`, scaffold, esbuild, pinned Three.js and cannon-es, page shell, caption bar, controller with snapshots, keyboard shortcuts, live region, CI check | Double-click and Pages both load the shell, offline. Next and Back cycle through placeholder steps. `npm run check` passes. |
 | M1 | **Data**: drop, floor, walls, shadows, edge shader, cursor repulsion | Cubes fall and settle at 60 fps. Repulsion feels physical. Back lifts them away. |
 | M2 | **Categorise** with palette | Recolour in 2 s or less. Back returns to black. |
 | M3 | **Sort**: steering and heaps | Heaps are stable and distinct. Back restores the Categorise scatter. |
@@ -391,9 +392,16 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M8 | Polish, performance, README, NOTICE, GitHub Pages | Runs on the latest Chrome, Edge, Firefox and Safari. Steady 60 fps on an integrated-GPU laptop. |
 | Stretch | Sound, mobile and touch, tooltips | – |
 
+### M0 as built
+
+- Generator defaults were tuned from the original script's values: detection over time 0.15 to 1.0 (was 0.2 to 0.9), habitat cut-off 0.3 (was 0.5), species rarity 0.6 to 1 (was 0.5 to 1). With these about 58% of random iterations pass the story checks (about 12% with the original values), and `--seed auto` finds a passing seed within a few tries. The committed cube is seed 1: 164 records.
+- Step transitions are placeholders (they ease the page theme and pause 0.4 s). The scene draws only the bounding box, turning slowly. The real steps replace them one milestone at a time.
+- The controller moves the visible step on at the **start** of a transition, so the caption changes while the animation plays. Buttons use `aria-disabled` while busy, not `disabled`, so keyboard focus is kept.
+- Verified in Edge from `file://`: no console errors; Next, Back, Restart, Page Up/Down and N/B work; the page theme eases black to white and back; the stage height stays constant between steps; the no-WebGL and missing-data messages show.
+
 ## 14. Testing
 
-- **Automated:** `check-story`, `check-palette` and a build-staleness check run in `npm run check` and in CI.
+- **Automated:** `npm run check` and CI run a build-staleness check, unit tests (`node --test`: data model, story checks, data loader, step controller, theme, tween, headless physics), `check-story` and `check-palette`.
 - **Manual, per milestone:**
   - Run from `file://` and from a local or Pages URL.
   - Walk forward and back through every step, including rapid presses (buttons must be disabled until the step is ready).

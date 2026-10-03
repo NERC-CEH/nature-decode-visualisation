@@ -1,0 +1,22 @@
+{
+  "name": "nature-decode-visualisation",
+  "version": "0.1.0",
+  "description": "Our planet. Decoded. An interactive 3D data cube animation.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "data": "node scripts/generate-data-cube.mjs",
+    "test": "node --test",
+    "check": "node scripts/build.mjs --verify && node --test && node scripts/check-story.mjs && node scripts/check-palette.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "cannon-es": "0.20.0",
+    "esbuild-wasm": "0.28.2",
+    "three": "0.186.1"
+  }
+}

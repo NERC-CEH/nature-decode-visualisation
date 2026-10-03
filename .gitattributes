@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# The built bundle is generated: keep its bytes exact (CI compares them) and out of diffs.
+dist/app.js -text -diff
+data/data-cube.json text eol=lf
+data/data-cube.js text eol=lf
+*.png binary
