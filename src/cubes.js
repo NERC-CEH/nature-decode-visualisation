@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { tween, ease } from './tween.js';
 import { spawnPlan } from './arena.js';
-import { DURATIONS } from './config.js';
+import { DURATIONS, PHYSICS } from './config.js';
 
 const EDGE_WIDTH = 0.045; // fraction of a cube face, on each side
 const EDGE_DARKEN = 0.55;
@@ -72,8 +72,13 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     mesh.setMatrixAt(i, dummy.matrix);
   }
 
-  function spawn(i, plan) {
-    const body = physics.addCube({ x: plan.x, y: getSpawnY() + plan.lift, z: plan.z }, plan.quaternion);
+  // `late` is how long after its release time the frame came, so on a slow frame the cube starts
+  // where it would have fallen to, and the stream stays smooth.
+  function spawn(i, plan, late) {
+    const g = PHYSICS.gravity;
+    const y = getSpawnY() + plan.velocity.y * late + 0.5 * g * late * late;
+    const body = physics.addCube({ x: plan.x, y, z: plan.z }, plan.quaternion);
+    body.velocity.set(plan.velocity.x, plan.velocity.y + g * late, plan.velocity.z);
     body.angularVelocity.set(plan.spin.x, plan.spin.y, plan.spin.z);
     state[i].spawned = true;
     state[i].body = body;
@@ -103,7 +108,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
     // `settle` seconds after the last cube has been released.
     drop(duration = DURATIONS.drop, settle = DURATIONS.dropSettle) {
       field.clear();
-      const plan = spawnPlan(count, arena, { duration });
+      const plan = spawnPlan(count, { duration });
       pending = plan.map((entry, i) => ({ i, entry })).sort((a, b) => a.entry.delay - b.entry.delay);
       clock = 0;
       return new Promise((resolve) => {
@@ -118,7 +123,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       clock += dt;
       while (pending.length && pending[0].entry.delay <= clock) {
         const { i, entry } = pending.shift();
-        spawn(i, entry);
+        spawn(i, entry, clock - entry.delay);
       }
       if (!pending.length) {
         const done = onDropped;

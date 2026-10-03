@@ -40,7 +40,7 @@ export const PHYSICS = {
 // Durations in seconds (technical-spec 6.2). Starting values, tuned by eye.
 export const DURATIONS = {
   theme: 1.0,
-  drop: 3.0, // cubes spawn, staggered, over this time
+  drop: 1.0, // cubes are released, one after another, over this time
   dropSettle: 0.5, // extra wait after the last cube spawns before the step is ready
   lift: 1.2, // cubes rise out of view on Back
 };
@@ -49,13 +49,23 @@ export const DURATIONS = {
 export const ARENA = {
   aspect: 1.5, // width / depth
   areaPerCube: 6, // floor area for every cube, in square units
-  margin: 1.2, // spawn this far inside the walls
-  spawnSeed: 1, // spawn positions repeat for a given data file
+  spawnSeed: 1, // spawn order and spin repeat for a given data file
 };
 
-// Camera for the floor steps: how far above horizontal it looks down, in degrees.
+// The drop is a stream of cubes pouring into the middle of the floor. Cubes are released down
+// several side-by-side lanes at once, with a downward speed that keeps cubes in the same lane
+// apart, so none start inside another.
+export const STREAM = {
+  speed: 28, // downward speed at release, units/s
+  gap: 1.8, // least distance between cubes in one lane at release (a turned cube is up to 1.73 across)
+  spacing: 1.25, // spiral spacing of the lanes, which sets how wide the stream is
+  drift: 2, // random sideways speed at release, so the pile spreads
+};
+
+// Camera for the floor steps: elevation is how far above horizontal it looks down, in degrees.
 export const CAMERA = {
   elevation: 10,
+  floorHeight: 1 / 3, // the cubes settle this far up the screen, from the bottom
 };
 
 // Cursor repulsion (technical-spec 7.1). Accelerations are per second, so the push is the same at

@@ -194,7 +194,7 @@ Generator tasks (M0):
 
 | Transition | Forward | Back |
 |---|---|---|
-| Intro → Data | Background eases from black to white over 1 s, then the cubes drop, staggered, over 3 s. Ready after the last spawn. | Cubes rise out of view (1.2 s), then the background eases to black |
+| Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 1 s. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
 | Data → Categorise | Random-order recolour, 2 s total, each cube 0.3 s | Recolour to black, 1 s |
 | Categorise → Sort | Cubes slide to their heap spots and tumble in, 3 s | Ease to the Categorise snapshot, 1.2 s |
 | Sort → Arrange | Each heap rises in turn and spreads into its sheet, 3.5 s | Ease to the Sort snapshot, 1.5 s |
@@ -214,7 +214,7 @@ Generator tasks (M0):
 | # | Step | Forward | Interaction |
 |---|---|---|---|
 | 0 | Intro | Title and line fade in on black. | Next. |
-| 1 | **Data** | Black cubes drop from above the frame, tumble and scatter across the floor. | Cursor repels cubes. |
+| 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 1 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
 | 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. | Cursor repels cubes. |
 | 3 | **Sort** | Cubes are steered to one spot per species, in a row across the floor in display order, and tumble into heaps there. No labels. | Cursor repels cubes. |
 | 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box and axis titles fade in. | Drag to rotate. Spring back. |
@@ -258,7 +258,7 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 
 ### 7.5 Camera and framing
 
-- Perspective camera at a 35° field of view for steps 0 to 4. Steps 0 to 3 look at the floor from a low angle, 10° above horizontal (`CAMERA.elevation` in `config.js`, changed from an earlier 38° raised view at review). Arrange raises the camera to the height of the cube.
+- Perspective camera at a 35° field of view for steps 0 to 4. Steps 0 to 3 look at the floor from a low angle, 10° above horizontal (`CAMERA.elevation` in `config.js`; an earlier version used a raised 38° view). The view is lowered so the cubes settle one third of the way up the screen (`CAMERA.floorHeight`), leaving the sky free for the drop. Arrange raises the camera to the height of the cube.
 - Framing is fitted from the bounding sphere of the active content (floor area or cube) and the viewport aspect, so every size from 5 to 12 fits, with the caption bar subtracted.
 - The camera eases between keyframes. The user never moves the camera directly.
 
@@ -394,8 +394,8 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 
 ### M1 as built
 
-- The floor is sized from the cube count at 6 square units per cube, 1.5 : 1 wide (about 37 × 25 units for 164 cubes), so the cubes read as small. The camera is fitted to it at any window shape, and cubes are released from just above the top of the view.
-- Cubes drop over 3 s in seeded random order and positions, so a given data file always drops the same way. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
+- The floor is sized from the cube count at 6 square units per cube, 1.5 : 1 wide (about 37 × 25 units for 164 cubes), so the cubes read as small. The camera is fitted to it at any window shape, and cubes are released from just above the top of the view. The view is then lowered so the floor sits one third of the way up the screen.
+- Cubes pour into the middle of the floor as a stream over 1 s. They are released down several side-by-side lanes (a sunflower spiral, 1.25 units apart) at 28 units/s, so no cube starts inside another: cubes in one lane are at least 1.8 apart at release, and the number of lanes follows the cube count (11 lanes for 164 cubes). Release order, spin and sideways drift are seeded, so a given data file always drops the same way. If a frame is slow, cubes released during it start part-way down their fall, so the stream stays smooth. The step is ready 0.5 s after the last release. Back lifts the cubes out of view over 1.2 s, then the page eases to black.
 - Each cube has a thin darker edge drawn in its own shader (a darker version of its own colour), and the floor shows only the soft shadows. Cubes start near-black (`#111111`), not pure black, so the lighting still shows their shape.
 - Repulsion was tuned in a simulation (a resting cube next to a stationary cursor is driven out to the edge of the cursor's reach, about 6 units; a quick sweep nudges it 1 to 5 units). Final values are set by eye at review.
 - `?debug` on the page address exposes the app as `__dataCube` in the browser console, for testing.

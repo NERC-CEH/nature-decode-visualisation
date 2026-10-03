@@ -5,7 +5,7 @@ import { arenaSize, spawnPlan } from '../src/arena.js';
 import { createPhysics } from '../src/physics.js';
 import { repel } from '../src/repulsion.js';
 import { createCubeField } from '../src/cubes.js';
-import { REPEL } from '../src/config.js';
+import { REPEL, STREAM } from '../src/config.js';
 
 const dt = 1 / 60;
 
@@ -18,20 +18,48 @@ test('the arena grows with the cube count and keeps its shape', () => {
   assert.ok(Math.abs(large.width * large.depth / 400 - 6) < 1e-6, 'six square units per cube');
 });
 
-test('the spawn plan is repeatable, inside the walls and spread over the drop time', () => {
-  const arena = arenaSize(164);
-  const a = spawnPlan(164, arena, { duration: 3 });
-  const b = spawnPlan(164, arena, { duration: 3 });
-  assert.deepEqual(a, b);
-  assert.notDeepEqual(a, spawnPlan(164, arena, { duration: 3, seed: 2 }));
+test('the spawn plan is repeatable and releases one cube per time slot', () => {
+  const a = spawnPlan(164, { duration: 1 });
+  assert.deepEqual(a, spawnPlan(164, { duration: 1 }));
+  assert.notDeepEqual(a, spawnPlan(164, { duration: 1, seed: 2 }));
+  const delays = a.map((c) => c.delay).sort((x, y) => x - y);
+  delays.forEach((d, k) => assert.ok(Math.abs(d - (k * 1) / 164) < 1e-9));
   for (const c of a) {
-    assert.ok(Math.abs(c.x) <= arena.width / 2 - 1.2 + 1e-9);
-    assert.ok(Math.abs(c.z) <= arena.depth / 2 - 1.2 + 1e-9);
-    assert.ok(c.delay >= 0 && c.delay <= 3);
     const q = c.quaternion;
     assert.ok(Math.abs(Math.hypot(q.x, q.y, q.z, q.w) - 1) < 1e-9, 'unit quaternion');
+    assert.equal(c.velocity.y, -STREAM.speed);
   }
-  assert.ok(Math.max(...a.map((c) => c.delay)) > 2.7, 'cubes keep arriving until the end');
+});
+
+test('the stream is a narrow column into the middle of the floor', () => {
+  const plan = spawnPlan(164, { duration: 1 });
+  const arena = arenaSize(164);
+  for (const c of plan) {
+    assert.ok(Math.hypot(c.x, c.z) < 5, 'within a few units of the centre');
+    assert.ok(Math.abs(c.x) < arena.width / 2 && Math.abs(c.z) < arena.depth / 2);
+  }
+});
+
+test('no cube is released inside another: lanes are apart and cubes in a lane are spaced out', () => {
+  for (const count of [30, 164, 405]) {
+    const plan = spawnPlan(count, { duration: 1 });
+    const lanes = new Map();
+    for (const c of plan) {
+      const key = c.x + ',' + c.z;
+      if (!lanes.has(key)) lanes.set(key, { x: c.x, z: c.z, times: [] });
+      lanes.get(key).times.push(c.delay);
+    }
+    const list = [...lanes.values()];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        assert.ok(Math.hypot(list[i].x - list[j].x, list[i].z - list[j].z) >= 1.2, 'lanes at least 1.2 apart');
+      }
+      const times = list[i].times.sort((x, y) => x - y);
+      for (let k = 1; k < times.length; k++) {
+        assert.ok((times[k] - times[k - 1]) * STREAM.speed >= STREAM.gap - 1e-9, 'gap along the lane at release');
+      }
+    }
+  }
 });
 
 // ---- walls ---------------------------------------------------------------------------
@@ -131,16 +159,36 @@ test('cubes start hidden, and the drop releases all of them from above the frame
   const { field, physics, count } = makeField();
   for (let i = 0; i < count; i++) assert.equal(scaleOf(field, i), 0);
   const done = field.drop(0.5, 0);
-  field.tick(0.25);
+  for (let f = 0; f < 15; f++) field.tick(1 / 60);
   assert.ok(physics.bodies.length > 0 && physics.bodies.length < count, 'released over time');
-  field.tick(0.5);
+  for (let f = 0; f < 30; f++) field.tick(1 / 60);
   await done;
   assert.equal(physics.bodies.length, count);
   field.sync();
   for (let i = 0; i < count; i++) {
     assert.ok(Math.abs(scaleOf(field, i) - 1) < 1e-6);
-    assert.ok(positionOf(field, i).y >= 20, 'starts above the frame');
   }
+});
+
+test('a cube released late on a slow frame starts further down its fall, not at the top', async () => {
+  const { field, physics } = makeField(10);
+  const done = field.drop(0.5, 0);
+  field.tick(0.6); // one very slow frame releases everything at once
+  await done;
+  const heights = physics.bodies.map((b) => b.position.y);
+  assert.ok(heights.every((y) => y < 20), 'all have already fallen from the release height');
+  assert.ok(new Set(heights.map((y) => y.toFixed(2))).size > 5, 'and are spread out, not in one row');
+  assert.ok(physics.bodies.every((b) => b.velocity.y < -28), 'moving faster than the release speed');
+});
+
+test('cubes are released above the frame', async () => {
+  const { field, physics } = makeField(10);
+  const done = field.drop(0.5, 0);
+  field.tick(1 / 600); // the first cube is due at time zero
+  assert.ok(physics.bodies.length >= 1);
+  assert.ok(physics.bodies[0].position.y > 19.9 && physics.bodies[0].position.y <= 20);
+  field.tick(1);
+  await done;
 });
 
 test('dropped cubes fall to the floor and settle inside the arena', async () => {

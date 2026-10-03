@@ -45,6 +45,7 @@ export function createScene(container) {
   // The distance (along the viewing direction) at which the whole arena just fits in view.
   function fit() {
     if (!arena) return;
+    target.set(0, 0.5, 0);
     const { width, depth } = arena;
     const corners = [];
     for (const x of [-width / 2, width / 2]) {
@@ -70,6 +71,22 @@ export function createScene(container) {
       const mid = (near + far) / 2;
       if (visible(mid)) far = mid; else near = mid;
     }
+    place(far);
+
+    // Lower the floor in the frame: raise the point the camera looks at until the middle of the
+    // floor sits CAMERA.floorHeight of the way up the screen, leaving the sky free for the drop.
+    const wanted = -1 + 2 * CAMERA.floorHeight;
+    const baseY = target.y;
+    let shiftLow = 0;
+    let shiftHigh = far;
+    for (let i = 0; i < 30; i++) {
+      const mid = (shiftLow + shiftHigh) / 2;
+      target.y = baseY + mid;
+      place(far);
+      corner.set(0, baseY, 0).project(camera);
+      if (corner.y > wanted) shiftLow = mid; else shiftHigh = mid;
+    }
+    target.y = baseY + shiftHigh;
     place(far);
 
     // Release height: cubes start just above the top of the view, over the nearest edge of the
