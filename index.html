@@ -9,8 +9,10 @@
 </head>
 <body>
   <div id="app" class="app is-intro">
+    <!-- Read out by screen readers in this order for each step: the title, the tags and labels, then the caption -->
+    <div id="announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="false"></div>
     <header class="caption">
-      <div class="caption-body" aria-live="polite" aria-atomic="true">
+      <div class="caption-body">
         <h2 id="caption-title"></h2>
         <p id="insight-indicator" class="insight-indicator" aria-hidden="true" hidden></p>
         <p id="caption-text"></p>
@@ -25,6 +27,7 @@
       </div>
       <div id="callouts" class="callouts" aria-hidden="true"></div>
       <img id="logo" class="logo" src="assets/UKCEH_Logo_Tagline_Stacked_White_Data.png" alt="UKCEH. Our planet. Decoded." hidden>
+      <ul id="fallback" class="fallback" hidden></ul>
       <p id="status" class="status" role="alert" hidden></p>
     </main>
 

@@ -395,6 +395,43 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       mesh.visible = visible;
     },
 
+    // Run the drop and the physics for `seconds` without drawing them, in small chunks so the page stays
+    // responsive. Under reduced motion this reaches the end of a physics step without playing it.
+    // It stops early once `until()` is true, if that is given.
+    async headless(seconds, until = () => false) {
+      const frames = Math.round(seconds * 60);
+      for (let f = 0; f < frames; f++) {
+        field.tick(1 / 60);
+        physics.step(1 / 60);
+        if (f % 10 === 9 && until()) break;
+        if (f % 40 === 39) await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      field.sync();
+    },
+
+    // True while the Sort pull is still running.
+    get pulling() {
+      return Boolean(steering);
+    },
+
+    // True once every cube has been released and has come to rest.
+    get settled() {
+      return pending.length === 0 && physics.bodies.every((body) => body.sleepState === 2);
+    },
+
+    // Show the cubes, fading them in from nothing.
+    reveal(seconds) {
+      mesh.visible = true;
+      material.transparent = true;
+      material.depthWrite = false;
+      material.opacity = 0;
+      return tween({
+        duration: seconds,
+        easing: ease.inOutQuad,
+        onUpdate: (t) => { material.opacity = t; },
+      }).finished.then(() => setSolid());
+    },
+
     // Fade every cube to the colour `colourOf(i)` returns and to `alpha` (1 = solid, less =
     // see-through), all together, over `seconds`.
     blendTo(colourOf, alpha, seconds = DURATIONS.look) {

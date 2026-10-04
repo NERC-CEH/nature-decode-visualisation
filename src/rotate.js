@@ -3,6 +3,7 @@
 // horizontal one, applied to a pivot object at the middle of the cube.
 
 import { ROTATE } from './config.js';
+import { reducedMotion } from './motion.js';
 
 const TWO_PI = Math.PI * 2;
 // The shortest way round from one angle to another, so a cube turned more than half a turn
@@ -22,6 +23,8 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
   };
   let last = null;
   const waiting = [];
+  const held = new Set(); // arrow keys being held, which turn the cube like a drag does
+  const KEY_DIRECTION = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
   const apply = () => pivot.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
 
@@ -36,6 +39,13 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
     rotation.drag(e.clientX - last.x, e.clientY - last.y);
     last = { x: e.clientX, y: e.clientY };
   });
+  element?.addEventListener('keydown', (e) => {
+    if (!state.enabled || e.ctrlKey || e.metaKey || e.altKey || !KEY_DIRECTION[e.key]) return;
+    e.preventDefault();
+    held.add(e.key);
+  });
+  element?.addEventListener('keyup', (e) => held.delete(e.key));
+  element?.addEventListener('blur', () => held.clear());
   const release = () => { state.dragging = false; last = null; };
   element?.addEventListener('pointerup', release);
   element?.addEventListener('pointercancel', release);
@@ -46,16 +56,38 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
     get enabled() { return state.enabled; },
     set enabled(value) {
       state.enabled = value;
-      if (!value) release();
+      if (!value) { release(); held.clear(); }
       if (element) {
         element.style.cursor = value ? 'grab' : '';
         element.style.touchAction = value ? 'none' : '';
+        // On the turning steps the canvas can be reached with Tab and turned with the arrow keys
+        if (value) {
+          element.setAttribute?.('tabindex', '0');
+          element.setAttribute?.('role', 'application');
+          element.setAttribute?.('aria-roledescription', 'turnable data cube');
+        } else {
+          element.removeAttribute?.('tabindex');
+          element.setAttribute?.('role', 'img');
+          element.removeAttribute?.('aria-roledescription');
+        }
       }
     },
 
     // The angles it springs back to.
+    // Under reduced motion the cube cuts to the new angles instead of turning.
     setTarget(target) {
       state.target = { yaw: target.yaw, pitch: target.pitch };
+      if (reducedMotion()) rotation.jump();
+    },
+
+    // Go to the target angles at once.
+    jump() {
+      state.yaw = state.target.yaw;
+      state.pitch = state.target.pitch;
+      state.yawSpeed = 0;
+      state.pitchSpeed = 0;
+      apply();
+      if (waiting.length) waiting.splice(0).forEach((resolve) => resolve());
     },
 
     // Turn by a drag of (dx, dy) pixels.
@@ -70,6 +102,18 @@ export function createRotation({ element, pivot, settings = ROTATE }) {
     // Every frame: while not being dragged, a critically damped spring pulls the angles back.
     update(dt) {
       if (state.dragging) return;
+      if (held.size) {
+        // arrow keys turn the cube while they are held; when they are let go it springs back
+        for (const key of held) {
+          const [x, y] = KEY_DIRECTION[key];
+          state.yaw += x * settings.keySpeed * dt;
+          state.pitch = Math.max(-settings.maxPitch, Math.min(settings.maxPitch, state.pitch + y * settings.keySpeed * dt));
+        }
+        state.yawSpeed = 0;
+        state.pitchSpeed = 0;
+        apply();
+        return;
+      }
       const w = settings.spring;
       for (const [angle, speed, goal] of [['yaw', 'yawSpeed', state.target.yaw], ['pitch', 'pitchSpeed', state.target.pitch]]) {
         let error = angle === 'yaw' ? shortest(state[angle] - goal) : state[angle] - goal;

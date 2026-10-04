@@ -3,6 +3,7 @@
 // fades in. Both follow the cube if it moves, and fade out quickly when the step changes.
 
 import { CALLOUT } from './config.js';
+import { scaled } from './motion.js';
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
@@ -24,8 +25,9 @@ export function pickTopRight(points) {
 
 // `layer` is a positioned element over the stage; `locate(index)` gives the screen position of cube
 // `index` on the stage, or null; `pick()` chooses the cube index when the line starts; `obstacles()`
-// gives the screen positions of all the cubes, so the label can be put where it covers none.
-export function createCallout({ layer, locate, pick, obstacles = () => [], settings = CALLOUT }) {
+// gives the screen positions of all the cubes, so the label can be put where it covers none; `others()`
+// gives the boxes of the labels already showing, which a new label must not overlap.
+export function createCallout({ layer, locate, pick, obstacles = () => [], others = () => [], settings = CALLOUT }) {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('class', 'callout-line');
@@ -75,6 +77,7 @@ export function createCallout({ layer, locate, pick, obstacles = () => [], setti
     const height = layer.clientHeight;
     const boxHeight = label.offsetHeight || 90;
     const points = obstacles().filter(Boolean);
+    const taken = others().filter(Boolean);
     let best = null;
     for (const length of [settings.length, settings.length + 50, settings.length + 110]) {
       for (const angle of [settings.angle, 55, 70, 25, -25, -45]) {
@@ -85,7 +88,8 @@ export function createCallout({ layer, locate, pick, obstacles = () => [], setti
           const left = side > 0 ? endX + 10 : endX - 10 - settings.labelWidth;
           const box = { left: left - 14, right: left + settings.labelWidth + 14, top: endY - boxHeight / 2 - 14, bottom: endY + boxHeight / 2 + 14 };
           if (box.left < 8 || box.right > width - 8 || box.top < 8 || box.bottom > height - 8) continue;
-          const covered = points.filter((p) => p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom).length;
+          const clash = taken.some((r) => !(box.right < r.left || box.left > r.right || box.bottom < r.top || box.top > r.bottom));
+          const covered = points.filter((p) => p.x >= box.left && p.x <= box.right && p.y >= box.top && p.y <= box.bottom).length + (clash ? 1000 : 0);
           if (!best || covered < best.covered) best = { side, angle, length, covered };
           if (covered === 0) return best;
         }
@@ -145,6 +149,13 @@ export function createCallout({ layer, locate, pick, obstacles = () => [], setti
 
   return {
     get phase() { return phase; },
+    // The box this callout's label takes up on the stage, or null if it is not showing.
+    occupied() {
+      if (phase === 'idle' || phase === 'waiting' || label.hidden) return null;
+      const r = label.getBoundingClientRect();
+      const l = layer.getBoundingClientRect();
+      return { left: r.left - l.left, right: r.right - l.left, top: r.top - l.top, bottom: r.bottom - l.top };
+    },
     // Start the wait: the line begins `delay` seconds from now. `pick` chooses the cube (default: the
     // one given when the callout was made) and `onShown` is called once the label has faded in.
     schedule(text, { pick: choosePick = pick, delay = settings.delay, onShown = null, onLabel = null, region: area = null, side = 'right', outline: drawOutline = true } = {}) {
@@ -190,22 +201,22 @@ export function createCallout({ layer, locate, pick, obstacles = () => [], setti
         fade = 1;
       }
       if (phase === 'boxing') {
-        boxProgress = clamp01(clock / settings.box);
-        if (clock >= settings.box) { phase = 'growing'; clock = 0; boxProgress = 1; }
+        boxProgress = clamp01(clock / scaled(settings.box));
+        if (clock >= scaled(settings.box)) { phase = 'growing'; clock = 0; boxProgress = 1; }
       } else if (phase === 'growing') {
-        growth = clamp01(clock / settings.grow);
+        growth = clamp01(clock / scaled(settings.grow));
         growth = growth * growth * (3 - 2 * growth);
-        if (clock >= settings.grow) { phase = 'labelling'; clock = 0; growth = 1; const callback = labelling; labelling = null; callback?.(); }
+        if (clock >= scaled(settings.grow)) { phase = 'labelling'; clock = 0; growth = 1; const callback = labelling; labelling = null; callback?.(); }
       } else if (phase === 'labelling') {
-        labelAmount = clamp01(clock / settings.labelFade);
-        if (clock >= settings.labelFade) {
+        labelAmount = clamp01(clock / scaled(settings.labelFade));
+        if (clock >= scaled(settings.labelFade)) {
           phase = 'shown';
           const callback = shown;
           shown = null;
           callback?.();
         }
       } else if (phase === 'leaving') {
-        fade = 1 - clamp01(clock / settings.leave);
+        fade = 1 - clamp01(clock / scaled(settings.leave));
         if (fade <= 0) { reset(); return; }
       }
       if (phase !== 'waiting') draw();

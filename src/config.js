@@ -210,6 +210,7 @@ export const FACE = {
 // of the spring that returns it (larger is faster; the spring is critically damped).
 export const ROTATE = {
   sensitivity: 0.008,
+  keySpeed: 1.6, // radians a second while an arrow key is held
   maxPitch: 1.8,
   spring: 3.5,
 };

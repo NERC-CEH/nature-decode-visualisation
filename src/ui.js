@@ -4,6 +4,7 @@
 // Buttons use aria-disabled, not disabled, so keyboard focus is not lost while a step plays.
 
 import { SIMULATED_NOTE } from './config.js';
+import { reducedMotion, scaled } from './motion.js';
 
 // How long the title and caption take to slide and fade out and in, in milliseconds
 const FADE_OUT_MS = 900;
@@ -27,6 +28,8 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     insight: $('insight-indicator'),
     note: $('note'),
     credit: $('credit'),
+    announcer: $('announcer'),
+    fallback: $('fallback'),
     body: document.querySelector('.caption-body'),
     back: $('back'),
     next: $('next'),
@@ -41,17 +44,36 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
   // callout.js), then the caption text, so that people see the tags before they read on. A step with no
   // tags brings in the caption text straight after the title. A step that sets `captionWhenReady` holds
   // its title back until the step has finished.
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const shift = reduceMotion ? 0 : 80;
+  // Under reduced motion the text only fades, and quickly.
+  const shift = () => (reducedMotion() ? 0 : 80);
   const titleParts = [el.title, el.insight, el.note, el.credit];
   const slide = (targets, from, to, ms) => Promise.all(targets.map((target) => target.animate(
-    [{ opacity: from, transform: `translateX(${from ? 0 : shift}px)` }, { opacity: to, transform: `translateX(${to ? 0 : -shift}px)` }],
-    { duration: ms, easing: 'ease', fill: 'forwards' },
+    [{ opacity: from, transform: `translateX(${from ? 0 : shift()}px)` }, { opacity: to, transform: `translateX(${to ? 0 : -shift()}px)` }],
+    { duration: scaled(ms / 1000) * 1000, easing: 'ease', fill: 'forwards' },
   ).finished));
   let shownIndex = -1;
   let captionRun = 0;
   let waitingFor = null; // the step whose caption is waiting for it to finish
   let textRun = 0; // the caption text that is waiting for the tags and labels to finish (0 = none)
+  let textStep = null;
+  let withoutWebGL = false;
+
+  // What a screen reader says, in the same order as it appears on screen: the title, then each tag and
+  // label as it comes in, then the caption. Each message is added to a hidden live region.
+  const announce = (message) => {
+    if (!message) return;
+    const line = document.createElement('p');
+    line.textContent = message;
+    el.announcer.append(line);
+  };
+  const announceCaption = (step) => {
+    announce(step.text);
+    announce(step.summary);
+  };
+  const announceTitle = (step) => {
+    el.announcer.replaceChildren();
+    announce(step.insight ? `${step.title}, part ${step.insight} of 3` : step.title);
+  };
   const setCaption = (step) => {
     const hideNote = step.id === 'intro' || steps.indexOf(step) === steps.length - 1;
     el.app.classList.toggle('is-statement', Boolean(step.statement));
@@ -62,6 +84,11 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     el.title.textContent = step.title;
     el.text.textContent = step.text;
     el.summary.textContent = step.summary ?? '';
+    if (withoutWebGL) {
+      // no 3D view: the words of the step's tags and labels are shown as a list instead
+      el.fallback.replaceChildren(...(step.callout ?? []).map((entry) => Object.assign(document.createElement('li'), { textContent: entry.text })));
+      el.fallback.hidden = !step.callout;
+    }
     el.insight.hidden = !step.insight;
     el.insight.textContent = '';
     if (step.insight) {
@@ -82,6 +109,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     await slide([...titleParts, el.text], 1, 0, shownIndex === 0 ? 0 : FADE_OUT_MS).catch(() => {});
     if (run !== captionRun) return;
     setCaption(step);
+    announceTitle(step);
     if (step.captionWhenReady && current.busy) {
       await new Promise((resolve) => { waitingFor = resolve; });
       if (run !== captionRun) return;
@@ -90,8 +118,10 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     if (run !== captionRun) return;
     if (step.callout && onCaptionShown !== noCallouts) {
       textRun = run; // the caption text waits for revealText(), called when the last label is in
+      textStep = step;
       onCaptionShown(step);
     } else {
+      announceCaption(step);
       await slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
     }
   }
@@ -99,6 +129,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
   function revealText() {
     if (!textRun || textRun !== captionRun) return Promise.resolve();
     textRun = 0;
+    announceCaption(textStep);
     return slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
   }
   const press = (flag, action) => () => { if (flag()) action(); };
@@ -118,6 +149,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
 
   return {
     revealText,
+    announce,
     render(state) {
       current = state;
       const { step, index } = state;
@@ -128,7 +160,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
       el.app.classList.toggle('is-intro', isIntro);
       el.app.classList.toggle('is-busy', state.busy);
       el.heroText.textContent = steps[0].text;
-      el.canvasWrap.setAttribute('aria-label', step.canvasLabel);
+      el.canvasWrap.setAttribute('aria-label', step.rotate ? `${step.canvasLabel} Use the arrow keys to turn it; it springs back when you let go.` : step.canvasLabel);
 
       el.progressLabel.textContent = `Step ${index + 1} of ${steps.length}`;
       [...el.progress.children].forEach((li, i) => {
@@ -138,8 +170,11 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
       });
 
       if (index !== shownIndex) {
-        if (shownIndex < 0) setCaption(step);
-        else changeCaption(state);
+        if (shownIndex < 0) {
+          setCaption(step);
+          announceTitle(step);
+          announceCaption(step);
+        } else changeCaption(state);
         shownIndex = index;
       }
 
@@ -156,6 +191,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     },
 
     showNoWebGL() {
+      withoutWebGL = true;
       el.canvasWrap.hidden = true;
       el.status.hidden = false;
       el.status.textContent = 'The 3D view needs WebGL, which is not available in this browser. ' +

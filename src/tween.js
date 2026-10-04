@@ -1,4 +1,7 @@
-// Minimal tweening: one value from 0 to 1 over a duration, with easing.
+// Minimal tweening: one value from 0 to 1 over a duration, with easing. Under reduced motion every
+// duration is cut short (see motion.js).
+
+import { scaled } from './motion.js';
 
 export const ease = {
   linear: (t) => t,
@@ -13,7 +16,8 @@ const frame = (fn) =>
 
 // Runs `onUpdate(progress)` each frame, where progress is eased 0..1, and resolves `finished`
 // after a final call with exactly 1. `cancel()` stops it without a final call.
-export function tween({ duration, easing = ease.inOutCubic, onUpdate }) {
+export function tween({ duration: requested, easing = ease.inOutCubic, onUpdate }) {
+  const duration = scaled(requested);
   const start = performance.now();
   let cancelled = false;
   const finished = new Promise((resolve) => {
@@ -29,4 +33,4 @@ export function tween({ duration, easing = ease.inOutCubic, onUpdate }) {
   return { finished, cancel: () => { cancelled = true; } };
 }
 
-export const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+export const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, scaled(seconds) * 1000));

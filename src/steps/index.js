@@ -30,10 +30,12 @@ export function buildSteps(configSteps) {
   return configSteps.map((cfg) => ({
     ...cfg,
     async enter(ctx, info) {
+      if (!ctx.scene) { await ctx.setTheme(cfg.theme); return; } // no 3D view: the text still tells the story
       if (built[cfg.id]) return built[cfg.id].enter(ctx, info);
       await Promise.all([ctx.setTheme(cfg.theme), wait(PLACEHOLDER_PAUSE)]);
     },
     async reverse(ctx, info) {
+      if (!ctx.scene) { await ctx.setTheme(info.to.theme); return; }
       if (built[cfg.id]) return built[cfg.id].reverse(ctx, info);
       await Promise.all([ctx.setTheme(info.to.theme), wait(PLACEHOLDER_PAUSE)]);
     },

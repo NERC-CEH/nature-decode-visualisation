@@ -36,6 +36,10 @@ html, body {
 /* The 3D view fills the whole page, behind the caption and the controls; the camera is set so the
    scene is framed in the part between them (see scene.js) */
 .stage { grid-row: 1; }
+.canvas-wrap:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: -3px;
+}
 .canvas-wrap {
   position: absolute;
   top: 0;
@@ -323,3 +327,20 @@ button:focus-visible {
   text-wrap: balance;
 }
 .is-statement #caption-text { display: none; }
+
+/* Without WebGL: the labels of the step as a plain list in place of the 3D view */
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 3rem 24px 0;
+  list-style: none;
+  text-align: center;
+  font-size: 1.125rem;
+}
+.fallback[hidden] { display: none; }

@@ -2,7 +2,8 @@
 // heaps build up by physics as the cubes arrive and pile against each other. The heaps are not
 // labelled.
 
-import { DURATIONS } from '../config.js';
+import { DURATIONS, SORT } from '../config.js';
+import { reducedMotion } from '../motion.js';
 import { heapSpots } from '../steering.js';
 import { wait } from '../tween.js';
 
@@ -10,6 +11,15 @@ export const sortStep = {
   async enter(ctx) {
     const spots = heapSpots(ctx.arena, ctx.cube.displayOrder);
     const cubes = ctx.cube.cubes;
+    if (reducedMotion()) {
+      // no explosion or pull to watch: the heaps form out of sight and the cubes fade in on them
+      ctx.field.setVisible(false);
+      const heaps = ctx.field.steer((i) => spots[cubes[i].species], DURATIONS.sort, DURATIONS.sortSettle);
+      await ctx.field.headless(DURATIONS.sort + SORT.stragglers + 0.5, () => !ctx.field.pulling);
+      await heaps;
+      await ctx.field.reveal(0.4);
+      return;
+    }
     // First throw the cubes up and out and freeze them in mid air, so none are stuck in the pile
     // or on the floor, then pull them into their heaps.
     await ctx.field.explode();

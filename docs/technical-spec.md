@@ -376,11 +376,13 @@ From the brand palette by exhaustive search. Every nine-colour subset of the 15 
 
 ## 11. Accessibility
 
-- **Keyboard.** Next, Back and Restart are real buttons, reachable by Tab, with a visible focus ring. Enter and Space press the focused button. Global shortcuts that never conflict: **Page Down** or **N** for Next, **Page Up** or **B** for Back. The canvas is focusable on Arrange and the Insights. While it has focus, the **arrow keys** rotate the cube and releasing them springs it back.
-- **Screen readers.** The caption bar is an `aria-live="polite"` region announced on each step. The canvas has `role="img"` and an `aria-label` describing the current scene. Each Insight has a one-sentence plain-text description of the pattern (in `config.js`).
-- **Reduced motion** (`prefers-reduced-motion`): physics runs headless (7.1) and steps crossfade between end states in 0.4 s. Rotations become cuts. Cursor repulsion is off. Kiosk dwell times double.
-- **No WebGL.** The page shows the step titles and narration as readable text in sequence, with a short note that the 3D view needs WebGL.
-- Text contrast meets the guide's 5:1 (black on white, white on black). Large text and controls meet 3:1. See 9.2 for the tagline.
+Built, except the manual screen-reader pass (NVDA, VoiceOver), which still has to be done by a person.
+
+- **Keyboard.** Next, Back and Restart are real buttons, reachable by Tab, with a visible focus ring. Enter and Space press the focused button. Global shortcuts that never conflict: **Page Down** or **N** for Next, **Page Up** or **B** for Back. On the steps where the cube turns (Arrange, the Insights, the conclusion) the canvas takes focus with Tab, and the **arrow keys** turn the cube while held; when they are let go it springs back (`ROTATE.keySpeed`). The canvas has `role="application"` with the hint "Use the arrow keys to turn it" in its label on those steps, and `role="img"` elsewhere.
+- **Screen readers.** A hidden live region (`#announcer`) is read in the same order as the screen: the step's title (with "part 2 of 3" on the Insights), then each tag and label as it comes in, then the caption, then the plain-text description of the pattern for an Insight (`summary` in `config.js`). The canvas has an `aria-label` for the current scene. The tags and the visible title are not announced twice.
+- **Reduced motion** (`prefers-reduced-motion`, `src/motion.js`; read each time, so it can change mid-visit): no animation lasts longer than 0.4 s, so moves become quick fades; the text fades without sliding; the cube cuts to its new angle; the drop and the sort are run out of sight (stopping as soon as the cubes are at rest) and the cubes then fade in; there is no explosion; the cursor does not push cubes; the intro network holds still; the tags draw quickly.
+- **No WebGL.** The page shows a note, and every step still gives its title and caption; the words of the step's tags and labels are shown as a plain list where the 3D view would be. Next and Back change the page colour and the words.
+- Text contrast meets the guide's 5:1 (black on white, white on black). Large text and controls meet 3:1. See 9.2 for the tagline. Kiosk mode (6.3) is not built yet.
 
 ## 12. Decisions to confirm during the build
 
@@ -404,7 +406,8 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M5 (built) | **Insights** ×3: turns, dolly zoom to a flat grid, see-through cubes, key | Each face shows its claim at a glance. |
 | M6 (built) | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | Polish (built) | Caption along the bottom with the fade order; tags and labels on Data, Categorise, Sort, Arrange and the Insights; flat axis titles; explosion before Sort; softer Insight turns; Insights 2 coloured by count; conclusion step; random logo cubes and fade-out; credit link; stricter data checks | Reviewed by the project owner and in user testing. |
-| M7 | Kiosk mode, reduced motion, keyboard rotation, callouts in the live region, no-WebGL text walkthrough, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
+| Accessibility (built) | Keyboard turning, tags and labels announced in order, reduced motion, no-WebGL text view | Checked in a browser; the manual screen-reader pass is still to do. |
+| M7 | Kiosk mode | A loop of the whole story with no clicks, handing back to the visitor on any input. |
 | M8 | README, memory check over repeated Restarts (GitHub Pages deferred) | Runs on the latest Chrome, Edge, Firefox and Safari. 9³ runs smoothly on a laptop (confirmed by the project owner). |
 | Selectable size (built) | `npm run data:all`, `data/load-data.js`, `?size=N`, checks and tests for every size | Every size from 5 to 12 passes the story checks and runs the whole animation. |
 | Stretch | Mobile (13.1), sound, embed mode, localisation | – |

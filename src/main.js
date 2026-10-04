@@ -19,6 +19,7 @@ import { createController } from './controller.js';
 import { buildSteps } from './steps/index.js';
 import { createUi } from './ui.js';
 import { createCallout, pickTopRight } from './callout.js';
+import { reducedMotion } from './motion.js';
 
 const steps = buildSteps(STEPS);
 const ui = createUi({
@@ -135,11 +136,12 @@ const locate = (i) => {
 };
 // Each tag line and label is its own callout; a step's list plays one after another.
 const callouts = scene && field
-  ? [0, 1, 2, 3].map(() => createCallout({
+  ? [0, 1, 2, 3].map((n) => createCallout({
     layer: document.getElementById('callouts'),
     locate,
     pick: () => -1,
     obstacles: () => cube.cubes.map((_, i) => locate(i)),
+    others: () => callouts.filter((_, k) => k !== n).map((c) => c.occupied()),
   }))
   : [];
 let pendingCallouts = null;
@@ -217,7 +219,10 @@ function startCallouts(step) {
     callouts[n].schedule(text, {
       ...(side ? { region: () => rowsRegion(target, anchor), side, outline } : {}),
       delay: n === 0 ? undefined : (delay ?? 0),
-      onLabel: () => { if (reveal) frame?.showAxis(reveal, CALLOUT.labelFade); },
+      onLabel: () => {
+        if (reveal) frame?.showAxis(reveal, CALLOUT.labelFade);
+        ui.announce(text); // for screen readers: each label is read as it comes in
+      },
       pick: () => {
         const index = chooseTarget(target, used);
         used.add(index);
@@ -233,7 +238,7 @@ const controller = createController({
   steps,
   ctx,
   onChange: (state) => {
-    ctx.repel = Boolean(state.step.repel);
+    ctx.repel = Boolean(state.step.repel) && !reducedMotion(); // under reduced motion the cursor does not push cubes
     if (rotation) rotation.enabled = Boolean(state.step.rotate);
     if (state.index !== lastIndex) {
       callouts.forEach((c) => c.hide());
@@ -256,7 +261,7 @@ function update(dt) {
   field?.tick(dt);
   rotation?.update(dt);
   callouts.forEach((c) => c.update(dt));
-  network?.update(dt, scene?.pointerNdc());
+  if (!reducedMotion()) network?.update(dt, scene?.pointerNdc()); // the intro network holds still
   const point = ctx.repel && scene?.floorPoint();
   if (point) repel(physics.bodies, point, dt);
   physics.step(dt);
