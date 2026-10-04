@@ -30,12 +30,24 @@ test('there is one heap spot per species, in display order, spread evenly across
 test('neighbouring heaps are in different rows, which gives each more room', () => {
   const spots = heapSpots(arena, cube.displayOrder);
   const zs = cube.displayOrder.map((s) => spots[s].z);
-  for (let i = 1; i < zs.length; i++) assert.ok(Math.abs(zs[i] - zs[i - 1]) > SORT.zigzag);
+  for (let i = 1; i < zs.length; i++) assert.ok(Math.abs(zs[i] - zs[i - 1]) > SORT.zigzag * arena.depth);
   const apart = [];
   for (let i = 0; i < spots.length; i++) {
     for (let j = i + 1; j < spots.length; j++) apart.push(Math.hypot(spots[i].x - spots[j].x, spots[i].z - spots[j].z));
   }
-  assert.ok(Math.min(...apart) > 7, `heaps at least 7 units apart (closest ${Math.min(...apart).toFixed(1)})`);
+  assert.ok(Math.min(...apart) > 0.19 * arena.width, `heaps well apart (closest ${Math.min(...apart).toFixed(1)})`);
+});
+
+test('at every cube size every heap spot is on the floor, with room for the heap before the wall', () => {
+  for (const size of [5, 6, 7, 8, 9, 10, 11, 12]) {
+    const sized = loadCube(JSON.parse(readFileSync(size === 9 ? 'data/data-cube.json' : `data/data-cube-${size}.json`, 'utf8')));
+    const floor = arenaSize(sized.cubes.length);
+    const spots = heapSpots(floor, sized.displayOrder);
+    for (const s of spots) {
+      assert.ok(Math.abs(s.z) <= floor.depth / 2 - 1.1, `size ${size}: spot z ${s.z.toFixed(1)} is too close to the wall at ${(floor.depth / 2).toFixed(1)}`);
+      assert.ok(Math.abs(s.x) <= floor.width / 2 - 1.1, `size ${size}: spot x ${s.x.toFixed(1)}`);
+    }
+  }
 });
 
 // ---- steering a cube -------------------------------------------------------------------
@@ -214,4 +226,34 @@ test('the sort step is ready after a few seconds even if the pull has not finish
   } finally {
     config.DURATIONS.sortReady = saved;
   }
+});
+
+test('a cube that has reached its heap is no longer pulled, only slowed', () => {
+  const physics = createPhysics();
+  const body = physics.addCube({ x: 0.4, y: 5, z: 0 });
+  body.velocity.set(3, 0, 0);
+  steer(body, { x: 0, z: 0 }, 1 / 60, 1);
+  assert.ok(body.velocity.x < 3 && body.velocity.x > 0, 'only the drag acts: it slows but is not pushed back');
+  const outside = physics.addCube({ x: 5, y: 5, z: 0 });
+  steer(outside, { x: 0, z: 0 }, 1 / 60, 1);
+  assert.ok(outside.velocity.x < -1, 'a cube outside the release radius is pulled');
+});
+
+test('on the smallest floor the heaps stay low and no cube is left held up by the pull against the wall', async () => {
+  const small = loadCube(JSON.parse(readFileSync('data/data-cube-5.json', 'utf8')));
+  const floor = arenaSize(small.cubes.length);
+  const physics = createPhysics();
+  physics.setBounds(floor.width, floor.depth);
+  const field = createCubeField({ scene: new THREE.Scene(), physics, cubes: small.cubes, arena: floor });
+  const dropped = field.drop(2, 0, 1);
+  frames(field, physics, 5);
+  await dropped;
+  const spots = heapSpots(floor, small.displayOrder);
+  const boom = field.explode();
+  frames(field, physics, 1.2);
+  await boom;
+  field.steer((i) => spots[small.cubes[i].species], 3, 0.5);
+  frames(field, physics, 3.5); // well inside the main pull, when the pinned cubes used to hang
+  const heights = positionsOf(field).map((p) => p.y).sort((a, b) => b - a);
+  assert.ok(heights[0] < 3.2, `the highest cube is ${heights[0].toFixed(1)} up (3.9 with the old heap spots and no release; in the browser pinned cubes hung much higher)`);
 });

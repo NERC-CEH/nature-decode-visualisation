@@ -123,27 +123,32 @@ export const EXPLODE = {
 // so cubes shove through and keep sliding until the cubes ahead stop them, which builds a heap
 // rather than a flat patch), grows by `k` for every unit of distance and is capped at `max`.
 // `drag` slows sideways speed, which caps the speed of a cube at about base / drag units/s. The
-// pull fades out within `heapRadius` of the heap, so the heap spreads into a mound, not a column. The
+// pull fades out between `releaseRadius` and `heapRadius` of the heap, and stops altogether inside
+// `releaseRadius`: a cube that has arrived is only slowed, and settles where it is, so the heap spreads
+// into a mound, not a column. The
 // pull builds up over `rampIn` seconds and eases off over `rampOut`. After the main pull, cubes
 // still further than `farRadius` from their heap keep being pulled, for up to `stragglers` more
 // seconds (so the whole pull lasts 10 s at the most), until no more than `farShare` of the cubes
 // are still on their way. Heaps are spread
 // over `spread` of the floor's width, in two rows: `rowZ` is the middle of the two rows and
-// neighbouring heaps are `zigzag` units either side of it, which gives each heap more room.
+// neighbouring heaps are `zigzag` either side of it, which gives each heap more room. Both are shares
+// of the floor's depth, so the heaps stay on the floor at every size (a heap spot outside the wall
+// would pin the cubes against it, held up by friction, for as long as the pull lasts).
 export const SORT = {
   base: 120,
   k: 10,
   max: 300,
   drag: 6,
   heapRadius: 2,
+  releaseRadius: 1,
   rampIn: 0.4,
   rampOut: 0.6,
   farRadius: 5,
   farShare: 0.01,
   stragglers: 7,
   spread: 0.88,
-  rowZ: 5,
-  zigzag: 5,
+  rowZ: 0.2,
+  zigzag: 0.2,
 };
 
 // The arranged data cube. `pitch` is the distance between cell centres, so cubes of one unit leave

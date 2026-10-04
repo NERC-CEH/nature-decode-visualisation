@@ -6,7 +6,8 @@ import { SORT } from './config.js';
 
 // Where each species' heap forms: one spot per species, in a row across the floor in the order
 // the species stack in the cube (`order` lists species, bottom of the cube first). Neighbouring
-// heaps sit a little in front of and behind the line, which gives each more room.
+// heaps sit a little in front of and behind the line, which gives each more room. The rows are a
+// share of the floor's depth, so every spot is on the floor whatever the size of the cube.
 export function heapSpots(arena, order, settings = SORT) {
   const n = order.length;
   const usable = arena.width * settings.spread;
@@ -14,7 +15,7 @@ export function heapSpots(arena, order, settings = SORT) {
   order.forEach((species, k) => {
     spots[species] = {
       x: -usable / 2 + ((k + 0.5) * usable) / n,
-      z: (settings.rowZ ?? 0) + (k % 2 === 0 ? -1 : 1) * settings.zigzag,
+      z: arena.depth * ((settings.rowZ ?? 0) + (k % 2 === 0 ? -1 : 1) * settings.zigzag),
     };
   });
   return spots;
@@ -40,10 +41,14 @@ export function steer(body, target, dt, strength = 1, settings = SORT) {
   const distance = Math.hypot(dx, dz);
   if (distance < 1e-6) return;
   // Close to the heap the pull fades out, so cubes stop short of the exact middle and the heap
-  // spreads into a mound instead of a tall column.
-  const near = settings.heapRadius > 0 ? Math.min(1, distance / settings.heapRadius) : 1;
+  // spreads into a mound instead of a tall column. Within `releaseRadius` a cube has arrived and is
+  // not pulled at all: it is only slowed, so it settles where it is and gravity does the rest.
+  const release = settings.releaseRadius ?? 0;
+  const near = settings.heapRadius > release
+    ? Math.max(0, Math.min(1, (distance - release) / (settings.heapRadius - release)))
+    : (distance > release ? 1 : 0);
   const pull = Math.min(settings.max, settings.base + settings.k * distance) * strength * near;
-  body.wakeUp();
+  if (pull > 0) body.wakeUp();
   body.velocity.x += (dx / distance) * pull * dt - body.velocity.x * settings.drag * dt;
   body.velocity.z += (dz / distance) * pull * dt - body.velocity.z * settings.drag * dt;
 }
