@@ -1,6 +1,6 @@
 # Technical Specification: Our Planet. Decoded. Data Cube Animation
 
-Status: ready for build (M0). Sources: [scope.md](scope.md), the answers in [questions.md](questions.md), the UKCEH Brand Guidelines (v3, 2026) and logo guide, and the project sketches. The PDFs are kept locally and are gitignored.
+Status: M0 to M6 built, plus a polish pass (see 13). M7 (kiosk, accessibility) and M8 (finish) remain. Sources: [scope.md](scope.md), the answers in [questions.md](questions.md), the UKCEH Brand Guidelines (v3, 2026) and logo guide, and the project sketches. The PDFs are kept locally and are gitignored.
 
 ## 1. Summary
 
@@ -24,7 +24,7 @@ Navigation is **Next** and **Back** only. Each press plays an animation forward 
 | Data loading | Loaded from a data file, so regenerating the data needs no code change (5). |
 | Tagline | **Our planet. Decoded.** |
 | Font | **Arial**, the brand guide's approved fallback for Suisse International. A system font, so nothing is shipped. |
-| Look | Minimalist wireframe. White background and black text for steps 1 to 7. **The intro and the finale are black with white text**, and the background eases between them. Bounding cube edges are a fine light-grey stroke (`#B3B3B3`). |
+| Look | Minimalist wireframe. Titles are capitals in square brackets. White background and black text for steps 1 to 7. **The intro and the finale are black with white text**, and the background eases between them. Bounding cube edges are a fine light-grey stroke (`#B3B3B3`). |
 | Navigation | Next and Back. Back reverses the animation. No skipping. No URL state. |
 | Kiosk mode | Auto-play that loops without clicks. |
 | Categorise | Random-order recolour, 2 seconds at most. |
@@ -33,10 +33,12 @@ Navigation is **Next** and **Back** only. Each press plays an animation forward 
 | Arrange and Insights | Drag to rotate. No zoom. Snaps back to the intended view on release. |
 | Finale | Cubes dissolve into the dots of the UKCEH symbol, then the logo and tagline lock-up appears, with Restart. |
 | Species colours | Brand palette, checked for colour-blind safety (10). |
-| Tooltips | None. Kept as a future addition. |
-| Sound | Stretch goal: plastic clacks on impacts. |
+| Tooltips | None. Dropped. |
+| Sound | Stretch goal: plastic clacks on impacts, plus sounds for a tag appearing, a slide change, the cube turning and the move to the finale. Mute control, unlocked by a tap. |
 | Hosting | GitHub Pages and local double-click. Fully offline: no CDN. |
-| Mobile | Stretch goal. Desktop first. |
+| Mobile | Stretch goal. Landscape only: a phone held upright is asked to turn. Buttons only. 7 × 7 × 7 data by default on phones. Plan in 13.1. |
+| Data size | 9 × 9 × 9 by default. 10 is comfortable; 12 shows a slight lag on a laptop. `?size=5` to `?size=12` is planned (13.1). |
+| Captions | Along the bottom, over a full-height canvas. The order on each step is title, then tags and labels, then the caption text (7.9). |
 | Accessibility | Reduced motion, keyboard navigation, text alternatives (11). |
 | Maintenance | Simple. Few dependencies. |
 | Git | Brand guide PDFs and `sketches.pdf` are gitignored. Work is pushed to `main`. |
@@ -120,24 +122,26 @@ Time reads left to right in both views that contain it.
 
 ### 4.2 Page layout
 
-The layout follows the sketches: the 3D scene above a caption bar.
+The 3D canvas fills the whole page, and the caption sits over its lower part:
 
 ```
 +------------------------------------------------------------+
 |                                                            |
 |                       3D scene                             |
+|        (tag lines and labels point at cubes)               |
 |                                                            |
-+------------------------------------------------------------+
-|  STEP TITLE   two or three lines of narration    ▪ ▪ ▪ ▫ ▫ ▫ |
-|                                                 Back   Next |
-|  Simulated data.                                            |
+|  [ STEP TITLE ]  narration, two to four lines    ▪ ▪ ▪ ▫ ▫  |
+|  Simulated data.                               Back   Next |
 +------------------------------------------------------------+
 ```
 
-- The canvas fills the viewport above the caption bar. The caption bar is HTML, not part of the 3D render, so its text is selectable and readable by screen readers. Only the axis titles and the time arrow live in the 3D scene.
-- Progress at the right: one mark per step. The three Insight steps also show "1 · 2 · 3" above the narration.
-- On the finale, Next becomes **Restart**.
-- **Intro (black background, white text):** the title "Data cube", the line "Decoding nature reveals its stories." and Next. The sketch's four words (beautiful, intuitive, captivating, inspiring) are design aims for the team, not display text.
+- The caption is HTML, not part of the 3D render, so its text is selectable and readable by screen readers. The camera frames the scene in the part of the page above the caption (the canvas is larger than the stage and the view is offset), so cubes can pass behind the caption. Only the three axis titles and the time arrow live in the 3D scene.
+- The title is capitals in square brackets, about as tall as the narration beside it. The footnote is bottom left, the buttons bottom right.
+- Progress at the right: one mark per step. The three Insight steps also show "1 · 2 · 3" under the title.
+- The title, the footnote and the narration each fade and slide left when the step changes. On a new step the order is the title, then the tags and labels, then the narration (7.9).
+- **Intro (black background, white text):** the sentence "Decoding nature reveals its stories." large and centred over the network, with the UKCEH logo below it. The sketch's four words (beautiful, intuitive, captivating, inspiring) are design aims for the team, not display text.
+- **Conclusion:** the same sentence as a title alone, in capitals and brackets, centred at the bottom, with no narration.
+- **Finale:** the logo lock-up on black, a small credit link in place of the caption ("Design and implementation by Tom August"), and **Restart** in place of Next.
 
 ### 4.3 Look
 
@@ -177,13 +181,13 @@ Generator tasks (M0):
 - The cube is always n × n × n, and everything derives from `meta.size`.
 - Supported sizes are 5 to 12. That keeps the cube count under about 400, which cannon-es heaps handle at 60 fps on integrated graphics, and within the 12-colour palette.
 - The app shows a console warning outside this range but still runs.
-- At 9³ the target after tuning is about 120 to 200 cubes. That is enough to feel like "data" and to fill the faces. The current data has 88.
+- At 9³ the data has about 150 cubes. That is enough to feel like "data" and to fill the faces. 10³ runs smoothly; 12³ (about 400 cubes) shows a very small lag on a laptop. The default stays 9.
 
 ## 6. Step controller
 
 ### 6.1 Rules
 
-- Linear states: `intro → data → categorise → sort → arrange → insight1 → insight2 → insight3 → finale`.
+- Linear states: `intro → data → categorise → sort → arrange → insight1 → insight2 → insight3 → conclusion → finale`.
 - Each step module exports `enter()` (play forward from the previous step), `reverse()` (play back to the previous step) and `exit()` (clean up).
 - **Deterministic transitions** (recolour, rotation, flight to grid cells, finale) are tweens, and reverse plays the same tween backwards.
 - **Physics transitions** cannot be rewound. When the user leaves a step forward, the controller stores a **snapshot** of every cube's position, rotation and colour. Back eases the cubes from wherever they are to that snapshot over about 1.2 seconds, then hands them back to physics. Going forward again runs the physics fresh.
@@ -197,10 +201,13 @@ Generator tasks (M0):
 |---|---|---|
 | Intro → Data | Background eases from black to white over 1 s, then the cubes pour into the middle of the floor as a stream over 2 s, ramping up for the first second and down for the last. Ready 0.5 s after the last release. | Cubes rise out of view (1.2 s), then the background eases to black |
 | Data → Categorise | Random-order recolour, 2 s total, each cube 0.3 s | Recolour to black, 1 s |
-| Categorise → Sort | Cubes are pulled to their heap spots and pile up, 3 s, plus up to 7 s for stragglers (10 s at the most) | Ease to the Categorise snapshot, 1.2 s |
+| Categorise → Sort | An explosion throws the cubes up and out for 0.5 s and holds them frozen in mid air for 0.5 s; then they are pulled to their heap spots and pile up, for 3 s, plus up to 7 s for stragglers. Ready 4.5 s after the pull starts even if some cubes are still on their way (the pull carries on) | Ease to the Categorise snapshot, 1.2 s |
 | Sort → Arrange | Each heap lifts in turn and its cubes fly into their sheet of the cube, 3.5 s in all | Ease to the Sort snapshot, 1.5 s |
-| Arrange → Insight 1 → 2 → 3 | Cube rotation plus camera change, 1.5 s each | Same, reversed |
-| Insight 3 → Finale | Background eases from white to black while the cubes fly to the logo dots (3 s), then the lock-up fades in (1 s) | Lock-up fades out (0.5 s), cubes fly back and the page goes white (2.5 s) |
+| Arrange → Insight 1 → 2 → 3 | The camera pulls back a little (0.6 s), then the cube turns while the camera draws in to the face (2.5 s in all), with the colours changing over 1 s | Same, reversed |
+| Insight 3 → Conclusion | As Back from Insight 1 to Arrange, without the axis titles: pull back, turn to the arranged angle, solid colours | The Insight 3 turn |
+| Conclusion → Finale | The cubes not needed fade to white and shrink (0.9 s). Then the background eases from white to black while the 26 chosen cubes fly to the logo dots and the camera squares up (3 s), then the lock-up fades in (1 s) | Lock-up fades out (0.5 s), cubes fly back and the page goes white (2.5 s) |
+
+Within a step, the title fades in over 1.4 s, the tags start 0 s after that, and the narration follows the last label (7.9).
 
 ### 6.3 Kiosk mode
 
@@ -214,15 +221,16 @@ Generator tasks (M0):
 
 | # | Step | Forward | Interaction |
 |---|---|---|---|
-| 0 | Intro | Title and line fade in on black, over a slowly drifting network of small wireframe cubes joined by thin lines (7.8). | Next. |
-| 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 2 s. They land in a heap and tumble outward across the floor. | Cursor repels cubes. |
-| 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. | Cursor repels cubes. |
-| 3 | **Sort** | Cubes are pulled to one spot per species, spread across the floor in display order (in two alternating rows), and pile into heaps there. No labels. | Cursor repels cubes. |
-| 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box and axis titles fade in. | Drag to rotate. Spring back. |
-| 5 | **Insights 1** | The cube turns to the side face. Face rendering starts (7.4). | Drag to rotate. Spring back. |
-| 6 | **Insights 2** | Turns to the top face. | As above. |
-| 7 | **Insights 3** | Turns to the front face. | As above. |
-| 8 | **Finale** | The background eases to black. Cubes fly to the 26 logo dots, round off into discs and turn white. The surplus fades out on the way. The lock-up fades in around the symbol. | Restart. |
+| 0 | Intro | The sentence and logo fade in on black, over a slowly drifting network of small wireframe cubes joined by thin lines (7.8). | Next. |
+| 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 2 s. They land in a heap and tumble outward across the floor. One tag on a cube at the top right of the pile. | Cursor or touch repels cubes. |
+| 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. One tag. | Cursor repels cubes. |
+| 3 | **Sort** | The cubes are thrown apart and frozen in the air, then pulled to one spot per species, spread across the floor in display order (in two alternating rows), and pile into heaps there. Tags on the back left and back right heaps. | Cursor repels cubes. |
+| 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box fades in. Four tags (the corner of the cube, then one for each axis), each bringing in its axis title. | Drag to rotate. Spring back. |
+| 5 | **Insights 1** | The cube turns to the side face. Boxes round the top two rows (the specialists) and the bottom two (the generalists), each with a label. | Drag to rotate. Spring back. |
+| 6 | **Insights 2** | Turns to the top face. Cubes are opaque and coloured by how many are in their column, blue to red (7.4). Two tags off the sides of the box. | As above. |
+| 7 | **Insights 3** | Turns to the front face. Boxes round the bottom and top two rows with labels. | As above. |
+| 8 | **Conclusion** | The cube turns back to its arranged angle with no axis titles or tags. The title alone is shown at the bottom. | Drag to rotate. Spring back. |
+| 9 | **Finale** | Unneeded cubes fade out. The background eases to black. 26 randomly chosen cubes fly to the 26 logo dots, round off into discs and turn white. The lock-up fades in around the symbol. | Restart. |
 
 Every cube is the same object throughout and belongs to one cell (species, time, location) from the start. It is visibly the same data point from the moment it falls to the moment it lands in the cube.
 
@@ -232,7 +240,8 @@ Every cube is the same object throughout and belongs to one cell (species, time,
 - Cube bodies are boxes with friction 0.4 and restitution 0.2, so they tumble and settle like small plastic blocks. Sleeping is on, so settled cubes cost nothing.
 - **Bounds:** an invisible floor and four low invisible walls just outside the frame, so cubes never leave the view.
 - **Cursor repulsion:** raycast the pointer onto a horizontal plane at cube-centre height. Each frame, bodies within 4.5 units of the pointer are accelerated away from it, with a strength that falls off with the square of the distance, plus a small upward acceleration and random spin so they hop and tumble. The push is an acceleration, scaled by the frame time, so it feels the same at any frame rate. A cube at rest needs a push of more than about 12 units/s² (friction) to start moving, so far cubes stay still and near cubes are driven away. Woken bodies go back to sleep naturally. Touch (stretch) uses the touch point.
-- **Steering in Sort:** each cube gets a force toward its heap spot that weakens on arrival, so the heaps form by physics. A cap on speed prevents flying.
+- **Explosion before Sort:** cubes left in a pile on the floor can wedge against each other. So Sort begins with every cube thrown up and away from the middle of the pile (`EXPLODE` in `config.js`; cubes low in the pile get extra lift), after 0.5 s damped to a stop with gravity cancelled, so they hang in mid air for 0.5 s, spread out and off the floor. Then gravity returns and the pull starts.
+- **Steering in Sort:** each cube gets a force toward its heap spot that weakens on arrival, so the heaps form by physics. A cap on speed prevents flying. The step is ready 4.5 s after the pull starts even if a few cubes are still on their way; the next step takes over from wherever they are.
 - **Headless settle:** `physics.js` can step the world without rendering until every body sleeps (capped at 600 steps). Reduced motion uses this (11), and so does any end state that must be known in advance.
 
 ### 7.2 Arrange
@@ -243,26 +252,26 @@ Every cube is the same object throughout and belongs to one cell (species, time,
 
 ### 7.3 Axis labels
 
-- DOM labels (CSS2D), positioned from the 3D scene: "Species", "Location" and "Time →". They face the camera.
-- In a face view, the label of the collapsed axis (the one pointing at the viewer) fades out.
+- The three titles of the arranged cube, "Time", "Species" and "Location", are flat text (a canvas texture on a plane) lying along edges of the cube: Time under the arrow along the front, Species up the left edge of the front, Location along the bottom of the right side. They turn with the cube, so they read as part of the object. They are 50% grey, bold and large (`src/axistext.js`). On the Arrange step each fades in with its own tag.
+- In a face view the three titles and the arrow fade out and two upright HTML titles take their place, in the same style (large, bold, 50% grey), below and to the left of the face. The vertical one reads upwards.
 
 ### 7.4 Face views (Insights)
 
-Seen face-on, cubes in a line of sight hide each other. On the current data each face shows 37 to 51 squares for 88 cubes (about half of them hiding two or more), so the faces have to show counts. As built:
+Seen face-on, cubes in a line of sight hide each other, so each face has to show counts. As built:
 
 - **Which face shows what.** The cube is turned (not the camera). Insights 1 is the side face: location across, species up, with time along the line of sight. Insights 2 is the top face: time across (left to right), location up and down, with species along the line of sight. Insights 3 is the front face: time across, species up, with location along the line of sight. Each is a rotation of the cube about its middle: yaw 90° for the side, tilt 90° for the top, none for the front.
-- **Near-orthographic view.** The camera does a dolly zoom: its field of view narrows from 35° to 3° while it backs off from about 32 to about 280 units, which keeps the cube the same size on screen and flattens the picture into a grid. It does not swap to a true orthographic camera, because a swap would jump; at 3° the scale differs by about 2% between the near and far side of the cube. The face fits the view with 45% to spare (`FACE.margin`) for its two titles.
-- **See-through cubes, normal blending.** Cubes become 60% opaque (40% for the grey face), so the more cubes lie along a line of sight the darker the cell: one cube is a light tint, two a stronger one, three or more nearly solid. In the first draft this was multiply blending; ordinary transparency does the job here, because along any line of sight in the two coloured faces the overlapping cubes are of one species (so they have one colour whatever the order), and in the grey face all cubes are the same grey. It can be animated smoothly, which a switch of blending mode cannot.
-- **The grey face.** Species are put together on Insights 2, so mixed colours would mean nothing: the cubes fade to a dark grey (`#333333`) at 40% opacity there, and back to their species colours for Insights 3.
-- **The key.** The caption's footnote reads "Simulated data. Darker means more records." on the three Insight steps.
-- **Axis titles.** The arrow for time and the three titles of the arranged cube fade away; two upright titles that do not turn with the cube take their place, below and to the left of the face: Location and Species, then "Time →" and Location, then "Time →" and Species. The light-grey box stays as a border round the grid.
-- **Drag and snap back.** The cube can still be dragged round; it springs back to its face. Between faces the cube turns by the same spring (about 1.6 s to arrive).
-- **Back** goes to the face before, and from the first face to the arranged cube: the view widens again, the cube turns back to its arranged angle, the cubes become solid and coloured again, and the arrow and titles return.
+- **Near-orthographic view.** The camera does a dolly zoom: its field of view narrows from 35° to 3° while it backs off from about 32 to about 280 units, which keeps the cube the same size on screen and flattens the picture into a grid. It does not swap to a true orthographic camera, because a swap would jump. The face fits the view with 45% to spare (`FACE.margin`) for its two titles.
+- **Turning between faces.** The camera first pulls back about 45% of the way to the wide view (0.6 s) so the turn reads as 3D, then the cube turns while the camera draws in (2.5 s in all). The spring that turns the cube is softer (`ROTATE.spring`).
+- **Insights 1 and 3: see-through cubes in species colours.** Cubes are 60% opaque, so the more cubes lie along a line of sight the darker the cell. Along any line of sight in these two faces the overlapping cubes are of one species, so they have one colour whatever the order.
+- **Insights 2: colour by count.** Species mean nothing on this face, and grey tones were hard to tell apart (a see-through version with a stretched tone scale was tried first). Instead every cube is opaque and takes the colour for the number of cubes in its column (the same time and location): a blue to red scale (`FACE.countColours`) from the fewest to the most. The footnote reads "Simulated data. Red means more records, blue fewer." Insights 1 and 3 keep "Darker means more records."
+- **Axis titles.** The upright titles for a face are "Location" and "Species", "Time →" and "Location", then "Time →" and "Species". The light-grey box stays as a border round the grid.
+- **Drag and snap back.** The cube can still be dragged round; it springs back to its face.
+- **Back** goes to the face before, and from the first face to the arranged cube.
 
 ### 7.5 Camera and framing
 
 - Perspective camera at a 35° field of view for steps 0 to 4. Steps 0 to 3 look at the floor from a low angle, 10° above horizontal (`CAMERA.elevation` in `config.js`; an earlier version used a raised 38° view). The view is lowered so the cubes settle one third of the way up the screen (`CAMERA.floorHeight`), leaving the sky free for the drop. Arrange raises the camera to the height of the cube.
-- Framing is fitted from the bounding sphere of the active content (floor area or cube) and the viewport aspect, so every size from 5 to 12 fits, with the caption bar subtracted.
+- Framing is fitted from the bounding sphere of the active content (floor area or cube) and the stage aspect, so every size from 5 to 12 fits. The stage is the part of the page above the caption; the canvas itself is larger, and the camera has a view offset so the framing is unchanged by the caption.
 - The camera eases between keyframes. The user never moves the camera directly.
 
 ### 7.6 Rendering
@@ -276,12 +285,13 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 ### 7.7 Finale
 
 - `scripts/extract-logo-dots.mjs` finds the 26 dots (radii 17, 31 and 41 px: 6 inner, 8 middle, 12 outer) in the lock-up PNG and writes their centres and radii, in image pixels, to `assets/logo-dots.json`. Because they come from the same file as the lock-up, the dots line up with the image exactly.
-- The camera is already orthographic from the face views. The symbol is placed in screen space where the lock-up will appear.
-- Choosing which cubes fly: 26 cubes are picked to minimise the total flight distance, and each is assigned a dot. The other cubes fade and shrink out during the flight.
+- The finale begins from the conclusion's view, so as the cubes fly the cube turns square on and the camera dollies to the face view, which is the view the symbol is placed for. The symbol is placed in screen space where the lock-up will appear.
+- Choosing which cubes fly: 26 cubes are picked at random (a different set each time) and paired with the dots so the total flight distance is as short as possible (the Hungarian algorithm). The other cubes first fade to white and shrink away, before anything else moves.
 - In flight, each cube morphs from box to sphere, scales to its dot's radius, rotates to face the camera and fades from species colour to white. In orthographic view the result is flat white discs identical to the white logo symbol on black.
 - The lock-up image then fades in over the discs. The symbol in the image and the discs coincide, so the hand-over cannot be seen. The discs are removed after the fade.
 - The tagline is also present as text in the live region for screen readers.
-- Reverse: the image fades out, the discs reappear, and the fliers return to the cube while the faded cubes return.
+- Reverse: the image fades out, the discs reappear, and every cube returns to its cell, regaining its colour, while the cube turns back to the conclusion's angle.
+- The final slide has a small credit link in place of the caption.
 
 ### 7.8 Intro network
 
@@ -294,41 +304,32 @@ Seen face-on, cubes in a line of sight hide each other. On the current data each
 - On Next the network fades out over the same 1 s, and with the same easing, as the page eases to white. On Back to the intro it fades back in. It is not shown on the finale. It does no work while hidden.
 - Reduced motion (M7): the network stays but stops moving.
 
+### 7.9 Tags, labels and caption order
+
+- A **callout** is a tag line and a label (`src/callout.js`). A step lists them in `callout` in `config.js`; each has a `target` (a cube picked by a rule: the top right of the pile, a heap, the left- or right-most cube, the lowest, a corner of the cube, a pair of rows, or the sides of the box) and its text. They play one after another.
+- The line grows out from a point a little away from the target (so it never hides it) over 0.8 s; then the label fades in over 0.6 s; then the next callout begins (after an optional delay). Rows and the corner use a rectangle that traces itself. Everything follows its cube every frame, so it moves if the cube moves, and fades out in 0.2 s when Next or Back is pressed.
+- The line's direction and length are chosen so the label covers no cubes and stays on the stage; the label also has a halo in the page colour.
+- **Caption order.** The title fades in first, then the callouts, then the narration text, so that people see the tags before they read on. A step with no callouts shows the narration straight after the title. Steps that wait for physics (Data, Sort, Arrange, Insights) hold their title or their tags until the step is ready.
+- Gaps and wording are in `config.js` (`CALLOUT`, and `callout` on each step).
+
 ## 8. Narrative copy
 
 Brand voice: short sentences, decisive, no hedging, no exclamation marks. Each claim has to be visible in the data on screen (8.1).
 
-| Step | Title | Text |
-|---|---|---|
-| Intro | Data cube | Decoding nature reveals its stories. |
-| 1 | Data | Every record of wildlife is a data point. Smartphone apps and surveys now collect them in large numbers. On their own, they are scattered and hard to read. |
-| 2 | Categorise | Each record names a species. We give each species its own colour. |
-| 3 | Sort | We group the records by species. Some species have many records. Others have few. |
-| 4 | Arrange | We place each record in a cube with three axes: species, location and time. Each species is one sheet. A data cube is a stack of spreadsheets, one on top of another. |
-| 5 | Insights 1 | Species by location. Generalist species occur in many locations. Specialist species occur in few, because they depend on particular habitats. |
-| 6 | Insights 2 | Location by time. Records grow over time across locations, as more people record wildlife with smartphone apps. |
-| 7 | Insights 3 | Species by time. Overall recording rises, yet specialist records fall. That pattern points to a decline. |
-| Finale | – | Our planet. Decoded. |
+The wording of every title, narration, tag and label lives in `STEPS` in `src/config.js`. It is the single source and is edited there; this document does not repeat it.
 
 ### 8.1 Data-story fit
-
-The default cube (9³, seed 42) does not yet support the copy:
-
-- Records per time step run 9, 9, 5, 11, 10, 9, 8, 11, 16, a weak and noisy rise.
-- Only one of seven non-specialists occurs in all locations.
-- Records per location fall from 19 to 6 along the axis.
-- The specialist decline holds: there are no specialist records after time step 5.
 
 `check-story.mjs` asserts each claim **on the face views**, not on raw counts, because the viewer reads the faces:
 
 | Face | Assertion |
 |---|---|
 | Species × location | At least two species occupy two-thirds or more of locations. Each specialist occupies at most one habitat band. |
-| Location × time | Every time step and location has at least one record. Records summed over species rise across time: a positive Spearman correlation of at least 0.8 between time and records, and the last third has at least 1.5× the records of the first third. |
+| Location × time | Every time step and location has at least one record. Records summed over species rise across time: a Spearman correlation of at least 0.9 between time and records, and the last third has at least twice the records of the first. Every location has more records in the last third than the first, and at least 70% of locations have 1.5 times as many. The busiest cells (at least 3 records, or one under the maximum) are all in the later half of the time axis. |
 | Species × time | Total records rise (as above). Specialist records in the last third total zero. Specialist records in the first third total at least 4. |
 | Whole cube | Cube count is between 15% and 28% of cells (5.3). Every species has at least one record. |
 
-Some random iterations do not tell the story, so the check is essential. `npm run data` refuses to write data that fails, and `--seed auto` tries iterations until one passes (5.1). A fixed seed that fails is reported with the assertions it broke. The copy stays fixed while the data changes.
+The location × time checks are strict because Insights 2 colours every column of the top view: a gradient from blue to red across time has to be visible in every part of the picture. About 4% of random iterations pass at 9³. `npm run data` refuses to write data that fails, and `--seed auto` tries iterations until one passes (5.1). A fixed seed that fails is reported with the assertions it broke. The copy stays fixed while the data changes.
 
 ## 9. Branding
 
@@ -402,9 +403,17 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M4 (built) | **Arrange**: sheets, box, labels, rotate and spring back | Heaps rise into sheets. Rotation feels good. `preview/` deleted. |
 | M5 (built) | **Insights** ×3: turns, dolly zoom to a flat grid, see-through cubes, key | Each face shows its claim at a glance. |
 | M6 (built) | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
-| M7 | Kiosk mode, reduced motion, no-WebGL fallback, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
-| M8 | Polish, performance, README, NOTICE, GitHub Pages | Runs on the latest Chrome, Edge, Firefox and Safari. Steady 60 fps on an integrated-GPU laptop. |
-| Stretch | Sound, mobile and touch, tooltips | – |
+| Polish (built) | Caption along the bottom with the fade order; tags and labels on Data, Categorise, Sort, Arrange and the Insights; flat axis titles; explosion before Sort; softer Insight turns; Insights 2 coloured by count; conclusion step; random logo cubes and fade-out; credit link; stricter data checks | Reviewed by the project owner and in user testing. |
+| M7 | Kiosk mode, reduced motion, keyboard rotation, callouts in the live region, no-WebGL text walkthrough, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
+| M8 | README, memory check over repeated Restarts, GitHub Pages confirmed | Runs on the latest Chrome, Edge, Firefox and Safari. 9³ runs smoothly on a laptop (confirmed by the project owner). |
+| Stretch | Selectable data size, mobile (13.1), sound, embed mode, localisation | – |
+
+### 13.1 Stretch plan
+
+- **Selectable size:** `npm run data` makes one story-checked cube for each size from 5 to 12; `?size=N` picks one (default 9) by loading its script file, so `file://` and Pages still work.
+- **Mobile:** landscape only, with a "please turn your phone" prompt over the paused animation when held upright (and a landscape lock where the browser allows it). Default size 7 on phones. Touch drag repels and rotates (`touch-action: none`). A compact caption band on short screens, scaled callouts, quality tiers with a frame-time monitor, no swipe navigation, plain web (no installable page). Target: a mid-range Android phone at 30 fps.
+- **Sound:** Web Audio with small embedded samples: impact clacks, a tag appearing, a slide change, the cube turning, the move to the finale. Mute control; the first tap unlocks audio.
+- Dropped: tooltips, poster export, a Rapier physics swap.
 
 ### M1 as built
 
