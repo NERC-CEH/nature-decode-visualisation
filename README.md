@@ -10,7 +10,11 @@ selector (M7 and M8), then a landscape mobile version. See [docs/technical-spec.
 
 ## Run it
 
-Open `index.html` in a browser. It needs no server and no internet connection.
+Open `index.html` in a browser. It needs no server and no internet connection. It is run locally only for
+now: the repository is private and GitHub Pages is not turned on.
+
+Add `?size=N` to the address to change the size of the data cube, from 5 to 12 per side (default 9),
+for example `index.html?size=7`. 10 runs comfortably; 12 may lag on a laptop.
 
 ## Develop
 
@@ -20,12 +24,13 @@ Requires Node 20 or later.
 npm install
 npm run dev      # rebuild dist/app.js whenever src/ changes
 npm run build    # build dist/app.js once
-npm run data     # generate a new data cube into data/
+npm run data     # generate a new data cube into data/ (one size)
+npm run data:all # generate and check a cube for every size from 5 to 12
 npm run check    # build check, tests, data story check, palette check
 ```
 
 `dist/app.js` is built from `src/` and is committed, so the page runs straight from the repository
-and from GitHub Pages. Run `npm run build` after changing anything in `src/`. `npm run check` (and
+and from GitHub Pages if that is ever turned on (it is not: the repository is private and the page is only run locally for now). Run `npm run build` after changing anything in `src/`. `npm run check` (and
 the GitHub Action) fails if the committed bundle is out of date.
 
 ### Changing the data
@@ -44,7 +49,9 @@ npm run data -- --size 7 --habitats 3 --specialists 2
 npm run data -- --seed 12         # a fixed seed, which must pass the checks
 ```
 
-Cube sizes from 5 to 12 are supported.
+Cube sizes from 5 to 12 are supported. `npm run data:all` makes all eight: the default size 9 is
+`data/data-cube.json`, and the others are `data/data-cube-5.json`, `data-cube-6.json` and so on. The page
+picks the file from `?size=N` (`data/load-data.js`). `npm run check` checks every size.
 
 ## Brand assets
 

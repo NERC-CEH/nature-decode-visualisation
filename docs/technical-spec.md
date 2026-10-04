@@ -35,9 +35,9 @@ Navigation is **Next** and **Back** only. Each press plays an animation forward 
 | Species colours | Brand palette, checked for colour-blind safety (10). |
 | Tooltips | None. Dropped. |
 | Sound | Stretch goal: plastic clacks on impacts, plus sounds for a tag appearing, a slide change, the cube turning and the move to the finale. Mute control, unlocked by a tap. |
-| Hosting | GitHub Pages and local double-click. Fully offline: no CDN. |
+| Hosting | For now the page is only ever run locally (double-click `index.html`); the repository is private. GitHub Pages was the plan and is deferred until a public launch, so it is not enabled. Fully offline: no CDN. |
 | Mobile | Stretch goal. Landscape only: a phone held upright is asked to turn. Buttons only. 7 × 7 × 7 data by default on phones. Plan in 13.1. |
-| Data size | 9 × 9 × 9 by default. 10 is comfortable; 12 shows a slight lag on a laptop. `?size=5` to `?size=12` is planned (13.1). |
+| Data size | 9 × 9 × 9 by default. 10 is comfortable; 12 shows a slight lag on a laptop. `?size=5` to `?size=12` picks another (built, 13.1). |
 | Captions | Along the bottom, over a full-height canvas. The order on each step is title, then tags and labels, then the caption text (7.9). |
 | Accessibility | Reduced motion, keyboard navigation, text alternatives (11). |
 | Maintenance | Simple. Few dependencies. |
@@ -98,7 +98,7 @@ The current `preview/` folder is a review tool only. It is deleted once the Arra
 - `npm run data` runs the generator, then `check-story`, and writes both data files only if the checks pass.
 - `npm run check` runs the build plus all check scripts.
 - **Local use:** double-click `index.html`.
-- **GitHub Pages:** served from the `main` branch root. The workflow does not deploy anything. It fails if the committed `dist/app.js` does not match a fresh build, so a stale bundle cannot reach Pages unnoticed.
+- **GitHub Pages (deferred):** not enabled, as the repository is private and there is no launch planned. When it is wanted, it would be served from the `main` branch root. The workflow does not deploy anything. It fails if the committed `dist/app.js` does not match a fresh build, so a stale bundle cannot reach Pages unnoticed.
 
 ## 4. Layout and visual design
 
@@ -405,12 +405,13 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M6 (built) | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | Polish (built) | Caption along the bottom with the fade order; tags and labels on Data, Categorise, Sort, Arrange and the Insights; flat axis titles; explosion before Sort; softer Insight turns; Insights 2 coloured by count; conclusion step; random logo cubes and fade-out; credit link; stricter data checks | Reviewed by the project owner and in user testing. |
 | M7 | Kiosk mode, reduced motion, keyboard rotation, callouts in the live region, no-WebGL text walkthrough, accessibility pass | Keyboard-only and screen-reader walkthrough passes. |
-| M8 | README, memory check over repeated Restarts, GitHub Pages confirmed | Runs on the latest Chrome, Edge, Firefox and Safari. 9³ runs smoothly on a laptop (confirmed by the project owner). |
-| Stretch | Selectable data size, mobile (13.1), sound, embed mode, localisation | – |
+| M8 | README, memory check over repeated Restarts (GitHub Pages deferred) | Runs on the latest Chrome, Edge, Firefox and Safari. 9³ runs smoothly on a laptop (confirmed by the project owner). |
+| Selectable size (built) | `npm run data:all`, `data/load-data.js`, `?size=N`, checks and tests for every size | Every size from 5 to 12 passes the story checks and runs the whole animation. |
+| Stretch | Mobile (13.1), sound, embed mode, localisation | – |
 
 ### 13.1 Stretch plan
 
-- **Selectable size:** `npm run data` makes one story-checked cube for each size from 5 to 12; `?size=N` picks one (default 9) by loading its script file, so `file://` and Pages still work.
+- **Selectable size (built):** `npm run data:all` makes one story-checked cube for each size from 5 to 12 (`data/data-cube-N.*`, with 9 as `data/data-cube.*`); `?size=N` picks one (default 9) through `data/load-data.js`, which writes a script tag for that file, so `file://` keeps working. Sizes outside 5 to 12 fall back to 9. Phones will default to 7 (mobile work).
 - **Mobile:** landscape only, with a "please turn your phone" prompt over the paused animation when held upright (and a landscape lock where the browser allows it). Default size 7 on phones. Touch drag repels and rotates (`touch-action: none`). A compact caption band on short screens, scaled callouts, quality tiers with a frame-time monitor, no swipe navigation, plain web (no installable page). Target: a mid-range Android phone at 30 fps.
 - **Sound:** Web Audio with small embedded samples: impact clacks, a tag appearing, a slide change, the cube turning, the move to the finale. Mute control; the first tap unlocks audio.
 - Dropped: tooltips, poster export, a Rapier physics swap.
@@ -488,7 +489,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 
 - **Automated:** `npm run check` and CI run a build-staleness check, unit tests (`node --test`: data model, story checks, data loader, step controller, theme, tween, headless physics), `check-story` and `check-palette`.
 - **Manual, per milestone:**
-  - Run from `file://` and from a local or Pages URL.
+  - Run from `file://` (the only way it is run for now).
   - Walk forward and back through every step, including rapid presses (buttons must be disabled until the step is ready).
   - Resize the window during each step.
   - Try 5³, 9³ and 12³ data.
