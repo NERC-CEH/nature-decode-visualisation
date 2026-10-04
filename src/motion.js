@@ -5,7 +5,11 @@
 
 export const REDUCED_MAX = 0.4;
 
+// The address can override the system setting: ?motion=full always plays the full animation and
+// ?motion=reduced always uses the reduced version (handy for checking either from any browser).
 export function reducedMotion() {
+  const override = typeof location !== 'undefined' && /[?&]motion=(full|reduced)(?:&|$)/.exec(location.search || '');
+  if (override) return override[1] === 'reduced';
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 

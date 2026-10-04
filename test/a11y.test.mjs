@@ -57,6 +57,20 @@ test('under reduced motion the cube cuts to its new angle instead of turning', a
   });
 });
 
+test('?motion=full and ?motion=reduced in the address override the system setting', async () => {
+  const saved = globalThis.location;
+  try {
+    globalThis.location = { search: '?debug&motion=full' };
+    await withReducedMotion(true, () => assert.equal(reducedMotion(), false, 'full motion forced'));
+    globalThis.location = { search: '?motion=reduced' };
+    await withReducedMotion(false, () => assert.equal(reducedMotion(), true, 'reduced motion forced'));
+    globalThis.location = { search: '?motion=sideways' };
+    await withReducedMotion(true, () => assert.equal(reducedMotion(), true, 'anything else follows the system'));
+  } finally {
+    if (saved === undefined) delete globalThis.location; else globalThis.location = saved;
+  }
+});
+
 // ---- the physics steps are not played under reduced motion --------------------------------------
 test('under reduced motion the Data step settles the cubes out of sight and fades them in', async () => {
   const calls = [];
