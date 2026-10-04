@@ -186,16 +186,16 @@ export const LOGO = {
 
 // The face views (the Insights): the camera looks straight at a face of the cube through a view
 // this many degrees wide (narrow, so that perspective all but disappears), with `margin` times the
-// room the face needs for itself and its two axis titles. Cubes are drawn see-through there: a cube
-// is `alpha` opaque (computed from the data when species have been put together, see steps/insights.js), so the more cubes lie
-// behind each other along the line of sight, the darker the cell. `neutral` is the grey they take
-// when the colours mean nothing.
+// room the face needs for itself and its two axis titles. Cubes keep their species colour and are
+// drawn see-through there (`alpha` opaque), so the more cubes lie behind each other along the line of
+// sight, the darker the cell. The top view, where species colours mean nothing, instead colours every
+// cube by how many cubes are in its column (`countColours`, low to high), fully opaque.
 export const FACE = {
   fov: 3,
   margin: 1.45,
   alpha: 0.6,
-  neutral: '#000000', // black cubes, as their tone is the count, so the alpha comes from the data (steps/insights.js)
-  densityFloor: 0.04, // the share of light that gets through the deepest line of cubes
+  // blue for the fewest cubes in a column, through yellow to red for the most
+  countColours: ['#4575B4', '#91BFDB', '#FEE090', '#FC8D59', '#D73027'],
   turn: 2.5, // seconds to turn from one face to the next
   pullBack: 0.6, // seconds to pull back before the cube turns...
   pullBackShare: 0.45, // ...this share of the way from the face view towards the wide cube view, which brings back some perspective so the turn reads as 3D
@@ -245,7 +245,7 @@ export const STEPS = [
     title: 'Data',
     callout: [{ target: 'topRight', text: 'Each black cube represents a wildlife observation contributed by a member of the public.' }],
     captionWhenReady: true, // the caption appears once the last cube has been released (plus the settle time)
-    text: 'Every record of wildlife is a data point. Smartphone apps and surveys now collect them in large numbers. On their own, they are scattered and hard to read.',
+    text: 'People all over the country submit observations of wildlife through a range of websites, mobile apps, recording schemes, and societies, many supported by UKCEH.',
     theme: 'light',
     repel: true,
     canvasLabel: 'Many small black cubes fall and scatter across the floor.',
@@ -254,7 +254,7 @@ export const STEPS = [
     id: 'categorise',
     title: 'Categorise',
     callout: [{ target: 'topRight', text: 'Each wildlife observation has attributes; for example these observations have been coloured according to which species was seen.' }],
-    text: 'Each record names a species. We give each species its own colour.',
+    text: 'Data attributes provide information key for futher analysis; what was seen, where, when and by who?',
     theme: 'light',
     repel: true,
     canvasLabel: 'The scattered cubes take on a different colour for each species.',
@@ -268,7 +268,7 @@ export const STEPS = [
       { target: 'backRightHeap', text: 'Some species have few observations.' },
     ],
     calloutWhenReady: true,
-    text: 'We group the records by species. Some species have many records. Others have few.',
+    text: 'The more data we have for a species the more confident we can be about how its populations are changing, but it is often the rare species with little data that are most at risk of declines.',
     theme: 'light',
     repel: true,
     canvasLabel: 'The cubes gather into one heap per species, so each heap has a single colour.',
@@ -277,7 +277,7 @@ export const STEPS = [
     id: 'arrange',
     title: 'Arrange',
     rotate: true,
-    text: 'We place each record in a cube with three axes: species, location and time. Each species is one sheet. A data cube is a stack of spreadsheets, one on top of another.',
+    text: 'Data cubes are a bit like a pile of spreadsheets, one on top of another. Arranging the data in this way allows us to look for patterns in the data that might give us a clue about how species populations are changing.',
     theme: 'light',
     callout: [
       { target: 'cubeTopRight', text: 'We can put all our wildlife observations into a data cube.' },
@@ -294,7 +294,7 @@ export const STEPS = [
     title: 'Insights',
     rotate: true,
     note: 'Simulated data. Darker means more records.',
-    text: 'Species by location. Generalist species occur in many locations. Specialist species occur in few, because they depend on particular habitats.',
+    text: 'Specialist species occur in fewer locations than generalists, often because they require a specific habitat to survive. Because of these special requirements they are more susceptible to declines in a changing environment.',
     theme: 'light',
     insight: 1,
     // a rectangle round the rows, then a line off the left or right side of it, then the label
@@ -310,13 +310,13 @@ export const STEPS = [
     id: 'insight2',
     title: 'Insights',
     rotate: true,
-    note: 'Simulated data. Darker means more records.',
-    text: 'Location by time. Records grow over time across locations, as more people record wildlife with smartphone apps.',
+    note: 'Simulated data. Red means more records, blue fewer.',
+    text: 'With the development of new species identification guides, recording websites, and mobile phone applications it has become far easier to share wildlife observations. As a result we have seen a growth in the number of records over the long term.',
     theme: 'light',
     insight: 2,
     // lines off the left and right of the cube's box (`outline: false`: no rectangle), part of the way down
     callout: [
-      { target: 'cubeBox', side: 'left', outline: false, anchor: 0.15, text: 'In the past, few people submitted observations of wildlife.' },
+      { target: 'cubeBox', side: 'left', outline: false, anchor: 0.15, text: 'In the past, fewer people submitted observations of wildlife.' },
       { target: 'cubeBox', side: 'right', outline: false, anchor: 0.15, text: 'In recent years we have received more data as more people get involved in wildlife recording.', delay: 1 },
     ],
     calloutWhenReady: true,
@@ -328,7 +328,7 @@ export const STEPS = [
     title: 'Insights',
     rotate: true,
     note: 'Simulated data. Darker means more records.',
-    text: 'Species by time. Overall recording rises, yet specialist records fall. That pattern points to a decline.',
+    text: 'Land-use change, climate change and other factors are changing the environment around us. Generalists are better equipped to adapt to these changes.',
     theme: 'light',
     insight: 3,
     // a rectangle round each pair of rows, then a line off its side, then the label

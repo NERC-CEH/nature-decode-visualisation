@@ -64,6 +64,26 @@ test('the story checks fail on data that does not tell the story', () => {
   assert.ok(checkStory(falling).find((r) => r.name === 'records rise over time').pass === false);
 });
 
+test('the top view is checked: every location must get busier, and the busiest cells must be recent', () => {
+  const passes = (cube, name) => checkStory(cube).find((r) => r.name === name).pass;
+  const good = JSON.parse(readFileSync('data/data-cube.json', 'utf8'));
+  assert.ok(passes(good, 'every location gets busier over time'));
+  assert.ok(passes(good, 'the busiest cells are all in the later years'));
+
+  // one location gets no busier: its records are the same early and late
+  const stuck = structuredClone(good);
+  const third = Math.floor(good.meta.size / 3);
+  for (const layer of stuck.data) {
+    for (let t = 0; t < good.meta.size; t++) layer[t][0] = t < third || t >= good.meta.size - third ? 1 : 0;
+  }
+  assert.equal(passes(stuck, 'every location gets busier over time'), false);
+
+  // time run backwards: the busiest cells are now the early ones
+  const backwards = structuredClone(good);
+  backwards.data = backwards.data.map((layer) => [...layer].reverse());
+  assert.equal(passes(backwards, 'the busiest cells are all in the later years'), false);
+});
+
 test('the committed data cube passes the story checks and its script file matches', () => {
   const text = readFileSync('data/data-cube.json', 'utf8');
   const results = checkStory(JSON.parse(text));

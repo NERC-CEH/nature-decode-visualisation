@@ -9,7 +9,7 @@ import { createFrame } from '../src/frame.js';
 import { createRotation } from '../src/rotate.js';
 import { arrangement, cubeFrame } from '../src/layout.js';
 import { interpolateView, visibleHeight } from '../src/views.js';
-import { FACES, deepestStack, densityAlpha, insight1Step, insight2Step, insight3Step } from '../src/steps/insights.js';
+import { FACES, columnCounts, countColour, insight1Step, insight2Step, insight3Step } from '../src/steps/insights.js';
 import { CUBE, FACE, STEPS, speciesColour } from '../src/config.js';
 import { loadCube } from '../src/data.js';
 
@@ -52,15 +52,15 @@ test('Insights 3 shows time across and species up; location is along the line of
   assert.ok(onScreen(f, unit('y', 5)).up > onScreen(f, unit('y', -5)).up, 'species run upwards');
 });
 
-test('only the face that puts species together is grey', () => {
-  assert.deepEqual([FACES.insight1, FACES.insight2, FACES.insight3].map((f) => f.neutral), [false, true, false]);
+test('only the face that puts species together is coloured by count', () => {
+  assert.deepEqual([FACES.insight1, FACES.insight2, FACES.insight3].map((f) => f.byCount), [false, true, false]);
 });
 
 test('the Insight steps are the ones where the cube can be dragged, and they carry the key', () => {
   for (const id of ['insight1', 'insight2', 'insight3']) {
     const step = STEPS.find((s) => s.id === id);
     assert.equal(step.rotate, true);
-    assert.match(step.note, /Darker means more records/);
+    assert.match(step.note, id === 'insight2' ? /Red means more records/ : /Darker means more records/);
   }
 });
 
@@ -235,8 +235,8 @@ test('each Insight step turns to its face, narrows the view, and names its axes'
     assert.deepEqual(views[views.length - 1], ['view', 'face'], 'final view is the face view');
     assert.deepEqual(log.find((l) => l[0] === 'faceTitles'), ['faceTitles', face.horizontal, face.vertical]);
     const blend = log.find((l) => l[0] === 'blend');
-    assert.equal(blend[1], face.neutral ? densityAlpha(cube) : FACE.alpha);
-    if (face.neutral) assert.equal(blend[2], FACE.neutral);
+    assert.equal(blend[1], face.byCount ? 1 : FACE.alpha, 'the count colours are fully opaque');
+    if (face.byCount) assert.equal(blend[2], countColour(columnCounts(cube).counts[0], columnCounts(cube).max));
     else assert.equal(blend[2], speciesColour(cube.cubes[0].species));
   }
 });
@@ -265,11 +265,16 @@ test('the layout puts the arranged cube where the face views expect it', () => {
   assert.ok(centreY > 0);
 });
 
-test('the top view is toned so the deepest line of cubes is nearly black and a single cube is clearly lighter', () => {
-  const alpha = densityAlpha(cube);
-  const stack = deepestStack(cube);
-  const through = (n) => (1 - alpha) ** n;
-  assert.ok(stack >= 3, `the data has stacks of up to ${stack}`);
-  assert.ok(Math.abs(through(stack) - FACE.densityFloor) < 1e-9);
-  assert.ok(through(1) > 0.4 && through(2) < through(1) - 0.15, 'one cube against two: a clear step');
+test('the top view colours each cube by the number of cubes in its column, blue for few to red for many', () => {
+  const { counts, max } = columnCounts(cube);
+  assert.equal(counts.length, cube.cubes.length);
+  assert.ok(max >= 3, `columns of up to ${max} cubes`);
+  assert.equal(countColour(1, max), '#4575b4', 'one cube is blue');
+  assert.equal(countColour(max, max), '#d73027', 'the most is red');
+  const red = (n) => parseInt(countColour(n, max).slice(1, 3), 16);
+  assert.ok(red(max) > red(1), 'redder as the count rises');
+  // every cube in a column has the same count
+  const arranged = cube.cubes.map((_, i) => counts[i]);
+  assert.equal(Math.min(...arranged), 1);
+  assert.equal(Math.max(...arranged), max);
 });

@@ -9,37 +9,38 @@
 
 import { CUBE, DURATIONS, FACE, speciesColour } from '../config.js';
 import { wait } from '../tween.js';
+import * as THREE from 'three';
 import { arrangement } from '../layout.js';
 
-// The most cubes in any one line of sight when the cube is seen from above (along the species axis):
-// the most records in one cell of time and location.
-export function deepestStack(cube) {
-  const counts = new Map();
-  for (const cell of arrangement(cube.cubes, cube.displayOrder, cube.size)) {
-    const key = `${cell.x.toFixed(3)},${cell.z.toFixed(3)}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return Math.max(1, ...counts.values());
+// For the top view: how many cubes lie in each cube's column (the same time and location, along the
+// species axis). Returns { counts, max } with counts[i] for cube i.
+export function columnCounts(cube) {
+  const keys = arrangement(cube.cubes, cube.displayOrder, cube.size).map((cell) => `${cell.x.toFixed(3)},${cell.z.toFixed(3)}`);
+  const per = new Map();
+  for (const key of keys) per.set(key, (per.get(key) ?? 0) + 1);
+  const counts = keys.map((key) => per.get(key));
+  return { counts, max: Math.max(1, ...counts) };
 }
 
-// How opaque each black cube is in the top view. Each cube in a line of sight lets through the same share
-// of the light, so n cubes let through (1 - alpha)^n. It is chosen so the deepest stack lets through only
-// FACE.densityFloor, which spreads the tones from a single cube (light grey) to the deepest stack (black)
-// instead of squeezing the busiest cells together.
-export function densityAlpha(cube) {
-  return 1 - FACE.densityFloor ** (1 / deepestStack(cube));
+// The colour for a column of `n` cubes out of a most of `max`: blue for 1 to red for max.
+export function countColour(n, max, stops = FACE.countColours) {
+  const t = max <= 1 ? 0 : Math.min(1, Math.max(0, (n - 1) / (max - 1)));
+  const at = t * (stops.length - 1);
+  const k = Math.min(stops.length - 2, Math.floor(at));
+  return `#${new THREE.Color(stops[k]).lerp(new THREE.Color(stops[k + 1]), at - k).getHexString()}`;
 }
 
 export const FACES = {
-  insight1: { yaw: Math.PI / 2, pitch: 0, neutral: false, horizontal: 'Location', vertical: 'Species' },
-  insight2: { yaw: 0, pitch: Math.PI / 2, neutral: true, horizontal: 'Time \u2192', vertical: 'Location' },
-  insight3: { yaw: 0, pitch: 0, neutral: false, horizontal: 'Time \u2192', vertical: 'Species' },
+  insight1: { yaw: Math.PI / 2, pitch: 0, byCount: false, horizontal: 'Location', vertical: 'Species' },
+  insight2: { yaw: 0, pitch: Math.PI / 2, byCount: true, horizontal: 'Time \u2192', vertical: 'Location' },
+  insight3: { yaw: 0, pitch: 0, byCount: false, horizontal: 'Time \u2192', vertical: 'Species' },
 };
 
 // Turn to show `face`, from the arranged cube or from another face.
 export async function showFace(ctx, face) {
   const { cube, field, scene, frame, rotation } = ctx;
-  const colourOf = face.neutral ? () => FACE.neutral : (i) => speciesColour(cube.cubes[i].species);
+  const { counts, max } = columnCounts(cube);
+  const colourOf = face.byCount ? (i) => countColour(counts[i], max) : (i) => speciesColour(cube.cubes[i].species);
   // Phase 1: pull back slightly to make the rotation visible
   await Promise.all([
     scene?.setView('cube', FACE.pullBack, FACE.pullBackShare),
@@ -50,7 +51,7 @@ export async function showFace(ctx, face) {
   await Promise.all([
     scene?.setView('face', FACE.turn - FACE.pullBack),
     rotation.arrive(FACE.turn),
-    field.blendTo(colourOf, face.neutral ? densityAlpha(cube) : FACE.alpha, DURATIONS.look),
+    field.blendTo(colourOf, face.byCount ? 1 : FACE.alpha, DURATIONS.look),
   ]);
   // Phase 3: show the titles
   await frame?.showFaceTitles(face.horizontal, face.vertical, 0.5);

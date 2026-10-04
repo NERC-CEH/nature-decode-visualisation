@@ -68,8 +68,25 @@ export function checkStory(cube) {
   const rho = spearman(Array.from({ length: n }, (_, t) => t), byTime);
   const first = sum(byTime.slice(0, third));
   const last = sum(byTime.slice(n - third));
-  add('records rise over time', rho >= 0.8 && last >= 1.5 * first,
-    `Spearman ${rho.toFixed(2)} (want >= 0.8); last third ${last} vs first third ${first} (want >= 1.5x)`);
+  add('records rise over time', rho >= 0.9 && last >= 2 * first,
+    `Spearman ${rho.toFixed(2)} (want >= 0.9); last third ${last} vs first third ${first} (want >= 2x)`);
+
+  // The top view colours each cell of time x location by how many species have a record there, so the
+  // rise has to show in every part of that picture, not only in the totals.
+  const cells = Array.from({ length: n }, (_, t) => Array.from({ length: n }, (_, l) => sum(data.map((layer) => layer[t][l]))));
+  const earlyAt = (l) => sum(cells.slice(0, third).map((row) => row[l]));
+  const lateAt = (l) => sum(cells.slice(n - third).map((row) => row[l]));
+  const locations = Array.from({ length: n }, (_, l) => l);
+  const everyRises = locations.every((l) => lateAt(l) > earlyAt(l));
+  const strongRises = locations.filter((l) => lateAt(l) >= 1.5 * earlyAt(l)).length;
+  add('every location gets busier over time', everyRises && strongRises >= 0.7 * n,
+    `locations with more records in the last third than the first: ${locations.filter((l) => lateAt(l) > earlyAt(l)).length} of ${n} (want all); at least 1.5x: ${strongRises} of ${n} (want >= ${Math.ceil(0.7 * n)})`);
+  const deepest = Math.max(...cells.flat());
+  const busyFloor = Math.max(3, deepest - 1);
+  const busyTimes = [];
+  cells.forEach((row, t) => row.forEach((c) => { if (c >= busyFloor) busyTimes.push(t); }));
+  add('the busiest cells are all in the later years', busyTimes.length >= 3 && busyTimes.every((t) => t >= n / 2),
+    `${busyTimes.length} cells hold >= ${busyFloor} records (want >= 3), the earliest at time ${busyTimes.length ? Math.min(...busyTimes) : 'none'} (want >= ${Math.ceil(n / 2)})`);
 
   // Species x location face
   const wideMin = Math.ceil((2 * n) / 3);

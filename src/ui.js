@@ -9,7 +9,9 @@ import { SIMULATED_NOTE } from './config.js';
 const FADE_OUT_MS = 900;
 const FADE_IN_MS = 1400;
 
-export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = () => {} }) {
+const noCallouts = () => {};
+
+export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = noCallouts }) {
   const $ = (id) => document.getElementById(id);
   const el = {
     app: $('app'),
@@ -34,18 +36,22 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = ()
 
   let current = { canNext: false, canBack: false, canRestart: false };
 
-  // The title and text slide left and fade out, then the next ones slide in from the right and fade
-  // in. A step that sets `captionWhenReady` holds its caption back until the step has finished.
+  // The title (with the footnote) and the caption text slide left and fade out, then the next ones slide
+  // in from the right and fade in. The order on a new step is: the title, then the tags and labels (see
+  // callout.js), then the caption text, so that people see the tags before they read on. A step with no
+  // tags brings in the caption text straight after the title. A step that sets `captionWhenReady` holds
+  // its title back until the step has finished.
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const shift = reduceMotion ? 0 : 80;
-  // The footnote slides and fades with the title and text.
-  const slide = (from, to, ms) => Promise.all([el.body, el.note, el.credit].map((target) => target.animate(
+  const titleParts = [el.title, el.insight, el.note, el.credit];
+  const slide = (targets, from, to, ms) => Promise.all(targets.map((target) => target.animate(
     [{ opacity: from, transform: `translateX(${from ? 0 : shift}px)` }, { opacity: to, transform: `translateX(${to ? 0 : -shift}px)` }],
     { duration: ms, easing: 'ease', fill: 'forwards' },
   ).finished));
   let shownIndex = -1;
   let captionRun = 0;
   let waitingFor = null; // the step whose caption is waiting for it to finish
+  let textRun = 0; // the caption text that is waiting for the tags and labels to finish (0 = none)
   const setCaption = (step) => {
     const hideNote = step.id === 'intro' || steps.indexOf(step) === steps.length - 1;
     el.app.classList.toggle('is-statement', Boolean(step.statement));
@@ -72,15 +78,28 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = ()
     const run = ++captionRun;
     const { step } = state;
     // Leaving the opening slide, its caption is not on show, so there is nothing to fade out.
-    await slide(1, 0, shownIndex === 0 ? 0 : FADE_OUT_MS).catch(() => {});
+    textRun = 0;
+    await slide([...titleParts, el.text], 1, 0, shownIndex === 0 ? 0 : FADE_OUT_MS).catch(() => {});
     if (run !== captionRun) return;
     setCaption(step);
     if (step.captionWhenReady && current.busy) {
       await new Promise((resolve) => { waitingFor = resolve; });
       if (run !== captionRun) return;
     }
-    await slide(0, 1, FADE_IN_MS).catch(() => {});
-    if (run === captionRun) onCaptionShown(step);
+    await slide(titleParts, 0, 1, FADE_IN_MS).catch(() => {});
+    if (run !== captionRun) return;
+    if (step.callout && onCaptionShown !== noCallouts) {
+      textRun = run; // the caption text waits for revealText(), called when the last label is in
+      onCaptionShown(step);
+    } else {
+      await slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
+    }
+  }
+  // Bring in the caption text of the current step, once its tags and labels are all showing.
+  function revealText() {
+    if (!textRun || textRun !== captionRun) return Promise.resolve();
+    textRun = 0;
+    return slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
   }
   const press = (flag, action) => () => { if (flag()) action(); };
   const goNext = press(() => current.canNext || current.canRestart, () => (current.canRestart ? onRestart() : onNext()));
@@ -98,6 +117,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = ()
   });
 
   return {
+    revealText,
     render(state) {
       current = state;
       const { step, index } = state;

@@ -97,6 +97,10 @@ async function scatter() {
 test('sorting pulls the cubes into heaps, each in its own spot', async () => {
   const { field, physics } = await scatter();
   const spots = heapSpots(arena, cube.displayOrder);
+  // as the Sort step does: throw the cubes apart and hold them in mid air, then pull
+  const exploded = field.explode();
+  frames(field, physics, 1.2);
+  await exploded;
   const done = field.steer((i) => spots[cube.cubes[i].species], 3, 0);
   let finished = false;
   done.then(() => { finished = true; });

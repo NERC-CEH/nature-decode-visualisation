@@ -27,7 +27,6 @@ const ui = createUi({
   onBack: () => controller.back(),
   onRestart: () => controller.restart(),
   onCaptionShown: (step) => {
-    if (!step.callout) return;
     if (step.calloutWhenReady && controller.state.busy) pendingCallouts = step;
     else startCallouts(step);
   },
@@ -213,7 +212,7 @@ function startCallouts(step) {
   const entries = step.callout;
   const used = new Set();
   const play = (n) => {
-    if (n >= entries.length || !callouts[n]) return;
+    if (n >= entries.length || !callouts[n]) { ui.revealText(); return; } // the caption comes last
     const { target, text, reveal, delay, side, outline, anchor } = entries[n];
     callouts[n].schedule(text, {
       ...(side ? { region: () => rowsRegion(target, anchor), side, outline } : {}),
