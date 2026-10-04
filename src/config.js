@@ -183,6 +183,24 @@ export const CALLOUT = {
   labelWidth: 260,
 };
 
+// Kiosk mode (kiosk.js): the story plays itself. Once everything on a step has appeared it stays for
+// `base` seconds plus `perWord` for each word of the caption, but never less than `minDwell` or more than
+// `maxDwell`; the opening screen stays `introDwell` and the last `finaleDwell`, then the story starts again.
+// `idleReturn` is how long a visitor can do nothing, at an event (?kiosk), before it returns to the opening
+// screen and plays itself. `pointerGrace` is how long after it starts that moving the pointer is ignored.
+// `cursorSpeed` is how fast the virtual cursor sweeps over the cubes.
+export const KIOSK = {
+  introDwell: 5,
+  base: 3,
+  perWord: 0.25,
+  minDwell: 5,
+  maxDwell: 20,
+  finaleDwell: 8,
+  idleReturn: 90,
+  pointerGrace: 3,
+  cursorSpeed: 0.55,
+};
+
 // The logo in the finale: the lock-up image fills this share of the stage, as far as its shape
 // allows. The cubes become the dots of the symbol and are drawn flat white, as in the logo.
 export const LOGO = {

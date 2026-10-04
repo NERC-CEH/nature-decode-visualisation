@@ -36,6 +36,48 @@ html, body {
 /* The 3D view fills the whole page, behind the caption and the controls; the camera is set so the
    scene is framed in the part between them (see scene.js) */
 .stage { grid-row: 1; }
+/* Kiosk mode */
+.kiosk-start {
+  position: absolute;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  display: none;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-weight: normal;
+  text-decoration: underline;
+  opacity: 0.8;
+}
+.is-intro .kiosk-start { display: block; }
+.kiosk-start[hidden] { display: none; }
+.kiosk-status {
+  flex: 1;
+  margin: 0;
+  align-self: center;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.kiosk-status[hidden] { display: none; }
+.virtual-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border: 2px solid var(--fg);
+  border-radius: 50%;
+  opacity: 0.35;
+  pointer-events: none;
+}
+.virtual-cursor[hidden] { display: none; }
+
 .canvas-wrap:focus-visible {
   outline: 3px solid var(--fg);
   outline-offset: -3px;

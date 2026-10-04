@@ -5,13 +5,18 @@ An interactive 3D animation that shows how scattered records of wildlife become 
 [physical data cube](https://digitalenvironment.org/building-a-physical-data-cube/) as a web page.
 
 Status: every step of the animation works, from the opening screen to the logo and Restart, with tag
-lines and labels that point at the data. Still to do: kiosk mode, the accessibility pass and a data size
-selector (M7 and M8), then a landscape mobile version. See [docs/technical-spec.md](docs/technical-spec.md).
+lines and labels that point at the data. Kiosk mode, keyboard and screen-reader support and a data size selector are done. Still to do: a final
+README and checks (M8), then a landscape mobile version. See [docs/technical-spec.md](docs/technical-spec.md).
 
 ## Run it
 
 Open `index.html` in a browser. It needs no server and no internet connection. It is run locally only for
 now: the repository is private and GitHub Pages is not turned on.
+
+Kiosk mode makes the story play itself, for a screen at an event. Click "Play automatically" on the
+opening screen, or add `?kiosk` to the address to start it at once. Any key, click, touch or mouse
+movement hands control to the visitor; with `?kiosk`, if they then leave it alone for 90 seconds it returns
+to the start and plays again. The timings are `KIOSK` in `src/config.js`.
 
 The page always plays the full animation: it does not follow the system's reduced-motion setting. A
 reduced version (quick fades, no physics to watch) exists and is used only if the address has

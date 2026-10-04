@@ -209,13 +209,15 @@ Generator tasks (M0):
 
 Within a step, the title fades in over 1.4 s, the tags start 0 s after that, and the narration follows the last label (7.9).
 
-### 6.3 Kiosk mode
+### 6.3 Kiosk mode (built, `src/kiosk.js`)
 
-- Turned on by a "Play automatically" link on the intro, or by `?kiosk` in the URL. That is a mode switch, not step state, so links still start at the beginning.
-- Each step dwells for `4 s + 60 ms per word of narration` after it is ready. After the finale it restarts.
-- During the Data, Categorise and Sort dwells, a virtual cursor sweeps gently through the cubes, so passers-by see that they react.
-- Any key press, click or pointer movement over the page leaves kiosk mode and hands control to the visitor.
-- **Event idle return:** in kiosk mode only, after 90 seconds without input the page returns to the intro and auto-play resumes.
+- Turned on by the "Play automatically" link on the opening screen, or by `?kiosk` in the address (which starts at once and is called event mode). That is a mode switch, not step state, so links still start at the beginning.
+- Each step is left once **everything on it has appeared**: the step has finished, and its title, tags, labels and caption are all showing. It then stays for `KIOSK.base` (3 s) plus 0.25 s a word of the caption, never less than 5 s or more than 20 s. The opening screen stays 5 s and the last step 8 s, then the story starts again from the opening screen. All in `config.js`. Under reduced motion every stay doubles.
+- On the steps where the cursor pushes cubes (Data, Categorise, Sort), once they are complete a virtual cursor sweeps slowly over the floor, drawn as a faint ring, so passers-by see that the cubes react.
+- A status line at the bottom says "Playing automatically. Click, touch or press a key to take control."
+- Any key press, click, touch, scroll or movement of the pointer leaves kiosk mode and hands control to the visitor. A pointer movement has to be more than 4 px, and is ignored for 3 s after it starts, so moving the mouse away from the link does not undo it.
+- **Event idle return:** in event mode only, if the visitor then does nothing for 90 s, the page returns to the opening screen and plays itself again. After the link, taking over is for good.
+- The kiosk presses Next and Restart through the same step controller as the buttons, so it cannot run ahead of an animation.
 
 ## 7. Step behaviour
 
@@ -407,7 +409,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 | M6 (built) | **Finale**: dot extraction, flight, morph, lock-up, Restart | The hand-over to the logo cannot be seen. |
 | Polish (built) | Caption along the bottom with the fade order; tags and labels on Data, Categorise, Sort, Arrange and the Insights; flat axis titles; explosion before Sort; softer Insight turns; Insights 2 coloured by count; conclusion step; random logo cubes and fade-out; credit link; stricter data checks | Reviewed by the project owner and in user testing. |
 | Accessibility (built) | Keyboard turning, tags and labels announced in order, reduced motion, no-WebGL text view | Checked in a browser; the manual screen-reader pass is still to do. |
-| M7 | Kiosk mode | A loop of the whole story with no clicks, handing back to the visitor on any input. |
+| Kiosk (built) | Kiosk mode (6.3): the link, `?kiosk`, dwell times, virtual cursor, hand-over on input, idle return | The story loops with no clicks, and any input hands control back. |
 | M8 | README, memory check over repeated Restarts (GitHub Pages deferred) | Runs on the latest Chrome, Edge, Firefox and Safari. 9³ runs smoothly on a laptop (confirmed by the project owner). |
 | Selectable size (built) | `npm run data:all`, `data/load-data.js`, `?size=N`, checks and tests for every size | Every size from 5 to 12 passes the story checks and runs the whole animation. |
 | Stretch | Mobile (13.1), sound, embed mode, localisation | – |

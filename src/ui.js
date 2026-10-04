@@ -12,7 +12,7 @@ const FADE_IN_MS = 1400;
 
 const noCallouts = () => {};
 
-export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = noCallouts }) {
+export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = noCallouts, onCaptionComplete = noCallouts, onKioskStart = noCallouts }) {
   const $ = (id) => document.getElementById(id);
   const el = {
     app: $('app'),
@@ -29,6 +29,8 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     note: $('note'),
     credit: $('credit'),
     announcer: $('announcer'),
+    kioskStart: $('kiosk-start'),
+    kioskStatus: $('kiosk-status'),
     fallback: $('fallback'),
     body: document.querySelector('.caption-body'),
     back: $('back'),
@@ -123,6 +125,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     } else {
       announceCaption(step);
       await slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
+      if (run === captionRun) onCaptionComplete(steps.indexOf(step));
     }
   }
   // Bring in the caption text of the current step, once its tags and labels are all showing.
@@ -130,11 +133,16 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     if (!textRun || textRun !== captionRun) return Promise.resolve();
     textRun = 0;
     announceCaption(textStep);
-    return slide([el.text], 0, 1, FADE_IN_MS).catch(() => {});
+    const step = textStep;
+    const run = captionRun;
+    return slide([el.text], 0, 1, FADE_IN_MS).catch(() => {}).then(() => {
+      if (run === captionRun) onCaptionComplete(steps.indexOf(step));
+    });
   }
   const press = (flag, action) => () => { if (flag()) action(); };
   const goNext = press(() => current.canNext || current.canRestart, () => (current.canRestart ? onRestart() : onNext()));
   const goBack = press(() => current.canBack, onBack);
+  el.kioskStart.addEventListener('click', () => onKioskStart());
   el.next.addEventListener('click', goNext);
   el.back.addEventListener('click', goBack);
 
@@ -150,6 +158,12 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
   return {
     revealText,
     announce,
+    // Show or hide the kiosk status line and the "Play automatically" link for the kiosk's mode.
+    setKioskMode(mode) {
+      el.kioskStatus.hidden = mode !== 'auto';
+      el.kioskStart.hidden = mode === 'auto';
+      if (mode === 'auto') announce('Playing automatically. Press any key or click to take control.');
+    },
     render(state) {
       current = state;
       const { step, index } = state;
@@ -174,6 +188,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
           setCaption(step);
           announceTitle(step);
           announceCaption(step);
+          onCaptionComplete(index);
         } else changeCaption(state);
         shownIndex = index;
       }

@@ -1,6 +1,6 @@
 // Boot: load the data, build the scene and controller, wire up the UI.
 
-import { STEPS, DURATIONS, CALLOUT, speciesColour } from './config.js';
+import { STEPS, DURATIONS, CALLOUT, KIOSK, speciesColour } from './config.js';
 import { readGlobalCube } from './data.js';
 import { arenaSize, streamRadius } from './arena.js';
 import { createTheme } from './theme.js';
@@ -20,6 +20,7 @@ import { buildSteps } from './steps/index.js';
 import { createUi } from './ui.js';
 import { createCallout, pickTopRight } from './callout.js';
 import { reducedMotion } from './motion.js';
+import { createKiosk, listenForInput } from './kiosk.js';
 
 const steps = buildSteps(STEPS);
 const ui = createUi({
@@ -27,6 +28,8 @@ const ui = createUi({
   onNext: () => controller.next(),
   onBack: () => controller.back(),
   onRestart: () => controller.restart(),
+  onCaptionComplete: (index) => kiosk?.captionComplete(index),
+  onKioskStart: () => kiosk?.start(),
   onCaptionShown: (step) => {
     if (step.calloutWhenReady && controller.state.busy) pendingCallouts = step;
     else startCallouts(step);
@@ -251,10 +254,36 @@ const controller = createController({
       startCallouts(step);
     }
     ui.render(state);
+    kiosk?.stateChanged(state);
   },
 });
 let lastIndex = controller.state.index;
 ui.render(controller.state);
+
+// Kiosk mode: the story plays itself. Started by the link on the opening screen or by ?kiosk in the address.
+const eventMode = /[?&]kiosk(?:&|$)/.test(location.search);
+const kiosk = createKiosk({
+  controller,
+  steps,
+  eventMode,
+  reduced: reducedMotion,
+  onChange: (mode) => {
+    ui.setKioskMode(mode);
+    if (mode !== 'auto' && virtualCursor) virtualCursor.hidden = true;
+  },
+});
+listenForInput(kiosk);
+const virtualCursor = document.getElementById('virtual-cursor');
+if (eventMode) kiosk.start();
+
+// The ring that marks the kiosk's virtual cursor on the screen
+function showVirtualCursor(point) {
+  if (!point || !scene) { virtualCursor.hidden = true; return; }
+  const spot = scene.toStage({ x: point.x, y: 0.5, z: point.z });
+  if (!spot) { virtualCursor.hidden = true; return; }
+  virtualCursor.hidden = false;
+  virtualCursor.style.transform = `translate(${spot.x}px, ${spot.y}px)`;
+}
 
 // Everything that changes from one frame to the next.
 function update(dt) {
@@ -262,7 +291,10 @@ function update(dt) {
   rotation?.update(dt);
   callouts.forEach((c) => c.update(dt));
   if (!reducedMotion()) network?.update(dt, scene?.pointerNdc()); // the intro network holds still
-  const point = ctx.repel && scene?.floorPoint();
+  kiosk.update(dt);
+  const virtual = ctx.repel ? kiosk.virtualPoint(arena) : null;
+  const point = ctx.repel && (virtual ?? scene?.floorPoint());
+  showVirtualCursor(virtual);
   if (point) repel(physics.bodies, point, dt);
   physics.step(dt);
   field?.sync();
@@ -275,6 +307,8 @@ if (location.search.includes('debug')) {
   globalThis.__dataCube = {
     ctx,
     controller,
+    kiosk,
+    KIOSK,
     arena,
     speciesColour,
     DURATIONS,
