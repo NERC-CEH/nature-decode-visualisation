@@ -15,20 +15,20 @@ import { ROTATE, STEPS } from '../src/config.js';
 const cube = loadCube(JSON.parse(readFileSync('data/data-cube.json', 'utf8')));
 const arena = arenaSize(cube.cubes.length);
 
-// Run `fn` as a visitor who has asked for reduced motion (or not)
+// Run `fn` as a visitor who has (or has not) asked for reduced motion in the address
 async function withReducedMotion(reduced, fn) {
-  const saved = globalThis.matchMedia;
-  globalThis.matchMedia = (query) => ({ matches: reduced && query.includes('prefers-reduced-motion') });
+  const saved = globalThis.location;
+  globalThis.location = { search: reduced ? '?motion=reduced' : '' };
   try {
     return await fn();
   } finally {
-    if (saved) globalThis.matchMedia = saved; else delete globalThis.matchMedia;
+    if (saved === undefined) delete globalThis.location; else globalThis.location = saved;
   }
 }
 
 // ---- reduced motion -------------------------------------------------------------------------------
 test('reduced motion shortens every duration to a quick fade, and leaves short ones alone', async () => {
-  assert.equal(reducedMotion(), false, 'off when the browser does not say');
+  assert.equal(reducedMotion(), false, 'off unless the address asks for it');
   assert.equal(scaled(3), 3);
   await withReducedMotion(true, () => {
     assert.equal(reducedMotion(), true);
@@ -57,17 +57,22 @@ test('under reduced motion the cube cuts to its new angle instead of turning', a
   });
 });
 
-test('?motion=full and ?motion=reduced in the address override the system setting', async () => {
-  const saved = globalThis.location;
+test('the system setting is ignored: only ?motion=reduced in the address turns reduced motion on', () => {
+  const savedMedia = globalThis.matchMedia;
+  const savedLocation = globalThis.location;
   try {
-    globalThis.location = { search: '?debug&motion=full' };
-    await withReducedMotion(true, () => assert.equal(reducedMotion(), false, 'full motion forced'));
-    globalThis.location = { search: '?motion=reduced' };
-    await withReducedMotion(false, () => assert.equal(reducedMotion(), true, 'reduced motion forced'));
-    globalThis.location = { search: '?motion=sideways' };
-    await withReducedMotion(true, () => assert.equal(reducedMotion(), true, 'anything else follows the system'));
+    globalThis.matchMedia = (query) => ({ matches: query.includes('prefers-reduced-motion') });
+    globalThis.location = { search: '?debug' };
+    assert.equal(reducedMotion(), false, 'a system that asks for reduced motion still gets the full animation');
+    globalThis.location = { search: '?motion=full' };
+    assert.equal(reducedMotion(), false);
+    globalThis.location = { search: '?size=7&motion=reduced' };
+    assert.equal(reducedMotion(), true, 'but the address can ask for it');
+    globalThis.location = { search: '?motion=reducedx' };
+    assert.equal(reducedMotion(), false);
   } finally {
-    if (saved === undefined) delete globalThis.location; else globalThis.location = saved;
+    if (savedMedia) globalThis.matchMedia = savedMedia; else delete globalThis.matchMedia;
+    if (savedLocation === undefined) delete globalThis.location; else globalThis.location = savedLocation;
   }
 });
 

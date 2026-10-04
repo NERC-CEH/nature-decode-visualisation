@@ -13,9 +13,9 @@ selector (M7 and M8), then a landscape mobile version. See [docs/technical-spec.
 Open `index.html` in a browser. It needs no server and no internet connection. It is run locally only for
 now: the repository is private and GitHub Pages is not turned on.
 
-If the animations look very fast, your system is asking for reduced motion (on Windows: Settings,
-Accessibility, Visual effects, Animation effects). Add `?motion=full` to the address to play the full
-animation anyway, or `?motion=reduced` to see the reduced version.
+The page always plays the full animation: it does not follow the system's reduced-motion setting. A
+reduced version (quick fades, no physics to watch) exists and is used only if the address has
+`?motion=reduced`.
 
 Add `?size=N` to the address to change the size of the data cube, from 5 to 12 per side (default 9),
 for example `index.html?size=7`. 10 runs comfortably; 12 may lag on a laptop.
