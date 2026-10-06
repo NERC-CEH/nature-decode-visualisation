@@ -2,14 +2,19 @@
 // however slowly this machine renders.
 //
 // How: the page runs on a virtual clock (Playwright's page.clock). Time only moves when this
-// script advances it by exactly one frame, so tweens, timeouts, physics and rendering all see
-// 1/60 s steps. After each step a screenshot is piped to ffmpeg. Nothing depends on real speed.
+// script advances it, in exact 16 ms ticks, so tweens, timeouts, physics and rendering never see
+// real time. Screenshots are piped to ffmpeg. Nothing depends on how fast this machine renders.
 //
 // Usage: node scripts/capture-video.mjs [options]
 //   --size 20          cube size to generate (5 to 12 is the supported range; larger runs, with a
 //                      colour-palette warning). The data is generated in a temp folder and
 //                      served in place of data/data-cube.js, so the repo's data is untouched.
 //   --width 1920 --height 1080
+//   --fps 62.5         video frame rate. The page ticks every 16 ms (62.5 per second), so the rate is
+//                      rounded to 62.5 divided by a whole number: 31.25, 20.8, 15.6, 12.5, 10.4 ...
+//                      Lower rates capture fewer images, so a test run is quicker. The animation
+//                      still advances in its normal 16 ms ticks (physics and tweens are unchanged),
+//                      but only every Nth tick is photographed, and the video plays at real speed.
 //   --hold 3           seconds to dwell on each step once it is ready
 //   --sweep            move a virtual cursor through the cubes during Data, Categorise and Sort
 //   --data file.json   use this data file instead of generating one (its .js sits alongside)
@@ -18,8 +23,8 @@
 //
 // Needs: ffmpeg on the PATH, Chromium (PLAYWRIGHT_BROWSERS_PATH or a system install), and
 // `npm install` (playwright-core). Capturing is slow on purpose: allow roughly 1 to 3 s a frame
-// without a GPU, so a 60 s video (3,750 frames) can take an hour or more. Use a smaller --width and --height
-// or --max-seconds for test runs.
+// without a GPU, so a 60 s video at the full 62.5 fps (3,750 frames) can take an hour or more. For
+// test runs use a lower --fps, a smaller --width and --height, or --max-seconds.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
@@ -36,6 +41,7 @@ const { values: args } = parseArgs({
     size: { type: 'string', default: '20' },
     width: { type: 'string', default: '1920' },
     height: { type: 'string', default: '1080' },
+    fps: { type: 'string', default: '62.5' },
     hold: { type: 'string', default: '3' },
     sweep: { type: 'boolean', default: true },
     data: { type: 'string' },
@@ -47,12 +53,16 @@ const { values: args } = parseArgs({
 
 const width = Number(args.width);
 const height = Number(args.height);
-// Playwright's fake requestAnimationFrame fires every 16 ms, so one captured frame is exactly
-// 16 ms of animation and the video is 62.5 fps. (To get 60 fps, re-encode with `-r 60`.)
-const rafMs = 16;
+// Playwright's fake requestAnimationFrame fires every 16 ms (62.5 ticks a second). A captured
+// frame covers `step` whole ticks, so the video frame rate is 62.5 / step. For 60 fps playback
+// of a full-rate capture, re-encode with `-r 60`.
+const tickMs = 16;
+const step = Math.max(1, Math.round(1000 / tickMs / Number(args.fps)));
+const rafMs = tickMs * step; // animation time covered by one captured frame
 const fps = 1000 / rafMs;
 const holdFrames = Math.round(Number(args.hold) * fps);
 const maxFrames = Math.round(Number(args['max-seconds']) * fps);
+console.log(`Capturing every ${step === 1 ? 'tick' : `${step}th tick`}: ${fps.toFixed(2)} fps video.`);
 
 // 1. The data: generate a (big) cube into a temp folder, or use the one supplied.
 let dataJs;
@@ -94,12 +104,14 @@ page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.clock.install({ time: 0 });
 await page.goto(url);
 await page.waitForFunction(() => globalThis.__dataCube);
+// install() leaves the clock running with real time. Pause it, so time moves only in frame().
+await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
 
 // 4. ffmpeg reads PNG frames from stdin.
 const out = resolve(root, args.out);
 mkdirSync(dirname(out), { recursive: true });
 const ffmpeg = spawn('ffmpeg', [
-  '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-',
+  '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', fps.toFixed(4), '-i', '-',
   '-vf', 'format=yuv420p', '-c:v', 'libx264', '-crf', '14', '-preset', 'slow', '-movflags', '+faststart', out,
 ], { stdio: ['pipe', 'inherit', 'inherit'] });
 const ffmpegDone = new Promise((ok, fail) => { ffmpeg.on('close', (c) => (c === 0 ? ok() : fail(new Error(`ffmpeg exited ${c}`)))); });
@@ -124,9 +136,10 @@ async function frame() {
 }
 
 // A virtual cursor that sweeps back and forth through the cubes on the floor.
-async function sweepCursor(i) {
-  const x = width * (0.5 + 0.38 * Math.sin(i / 90));
-  const y = height * (0.52 + 0.12 * Math.sin(i / 47));
+async function sweepCursor() {
+  const t = (frames * rafMs) / 1000; // seconds of animation so far
+  const x = width * (0.5 + 0.38 * Math.sin(t * 0.69));
+  const y = height * (0.52 + 0.12 * Math.sin(t * 1.33));
   await page.mouse.move(x, y);
 }
 
@@ -144,13 +157,13 @@ while (!stop && !s.last) {
   console.log('step ->', s.id);
   let guard = 0;
   do {
-    if (args.sweep && s.repel) await sweepCursor(frames);
+    if (args.sweep && s.repel) await sweepCursor();
     stop = await frame();
     s = await state();
     if (++guard > 120 * fps) throw new Error(`Step ${s.id} never became ready`);
   } while (s.busy && !stop);
   for (let i = 0; i < holdFrames && !stop; i++) {
-    if (args.sweep && s.repel) await sweepCursor(frames);
+    if (args.sweep && s.repel) await sweepCursor();
     stop = await frame();
   }
 }
