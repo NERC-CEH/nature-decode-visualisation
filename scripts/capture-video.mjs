@@ -105,15 +105,20 @@ const ffmpeg = spawn('ffmpeg', [
 const ffmpegDone = new Promise((ok, fail) => { ffmpeg.on('close', (c) => (c === 0 ? ok() : fail(new Error(`ffmpeg exited ${c}`)))); });
 
 let frames = 0;
+const timing = { advance: 0, shot: 0 };
 const started = Date.now();
 async function frame() {
+  const t0 = Date.now();
   await page.clock.runFor(rafMs);
-  const png = await page.screenshot({ type: 'png' });
+  const t1 = Date.now();
+  const png = await page.screenshot({ type: 'png', timeout: 0 });
+  timing.advance += t1 - t0;
+  timing.shot += Date.now() - t1;
   if (!ffmpeg.stdin.write(png)) await new Promise((ok) => ffmpeg.stdin.once('drain', ok));
   frames += 1;
   if (frames % 60 === 0) {
     const perFrame = (Date.now() - started) / frames / 1000;
-    console.log(`frame ${frames} (${(frames * rafMs / 1000).toFixed(1)} s of video, ${perFrame.toFixed(2)} s/frame)`);
+    console.log(`frame ${frames} (${(frames * rafMs / 1000).toFixed(1)} s of video, ${perFrame.toFixed(2)} s/frame: ${(timing.advance / frames).toFixed(0)} ms simulate, ${(timing.shot / frames).toFixed(0)} ms screenshot)`);
   }
   return maxFrames > 0 && frames >= maxFrames;
 }
