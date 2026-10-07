@@ -9,6 +9,7 @@
     "dev": "node scripts/build.mjs --watch",
     "data": "node scripts/generate-data-cube.mjs",
     "data:all": "node scripts/generate-data-cube.mjs --all",
+    "video": "node scripts/capture-video.mjs",
     "test": "node --test",
     "check": "node scripts/build.mjs --verify && node --test && node scripts/check-story.mjs && node scripts/check-palette.mjs"
   },
@@ -19,6 +20,7 @@
     "cannon-es": "0.20.0",
     "esbuild-wasm": "0.28.2",
     "pngjs": "7.0.0",
+    "playwright-core": "^1.63.0",
     "three": "0.186.1"
   }
 }
