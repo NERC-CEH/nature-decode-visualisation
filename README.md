@@ -75,6 +75,10 @@ npm run video                                    # 1920 x 1080 at 62.5 fps, size
 npm run video -- --size 7 --width 960 --height 540 --fps 15.6 --max-seconds 20 --out video/test.mp4
 ```
 
+The video is not recorded in kiosk mode. By default the script moves the mouse back and forth over the
+floor during Data, Categorise and Sort, so the cubes are pushed as they are when a visitor moves the cursor
+(no cursor is drawn). Add `--no-sweep` to leave the cubes alone.
+
 Options are listed at the top of `scripts/capture-video.mjs`.
 
 ## Brand assets
