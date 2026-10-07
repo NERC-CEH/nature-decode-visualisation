@@ -65,9 +65,10 @@ picks the file from `?size=N` (`data/load-data.js`). `npm run check` checks ever
 ## Making a video
 
 `npm run video` plays the whole story and records it frame by frame, so the video is perfectly smooth
-however slowly the machine renders. It needs ffmpeg on the PATH (without it the frames are saved as PNG
-files, with the command to make the video) and a Chromium-based browser (the installed Edge or Chrome is
-found automatically; `--browser path` names another). The result is `video/data-cube.mp4`.
+however slowly the machine renders. It needs a Chromium-based browser (the installed Edge or Chrome is
+found automatically; `--browser path` names another). The video is made by the browser's own H.264 encoder,
+so nothing else needs installing; if ffmpeg is on the PATH it is used instead (`--encoder ffmpeg`), or
+`--encoder png` saves numbered PNG files. The result is `video/data-cube.mp4`.
 
 ```
 npm run video                                    # 1920 x 1080 at 62.5 fps, size 9 (slow: allow an hour or more)

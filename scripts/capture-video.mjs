@@ -25,10 +25,13 @@
 //   --out video/data-cube.mp4
 //   --browser path     a Chromium-based browser to use (default: PLAYWRIGHT_BROWSERS_PATH, then the
 //                      installed Edge or Chrome)
+//   --encoder auto     how to make the video: ffmpeg (if it is on the PATH), browser (the browser's own
+//                      H.264 encoder, with the mp4-muxer package: no ffmpeg or other program needed), or
+//                      png (save numbered PNG files and print the ffmpeg command). auto picks the first
+//                      that works, in that order.
+//   --bitrate 15       video bitrate in Mbit/s for the browser encoder (default: about 0.12 bits a pixel at 30 fps or more, and at least 3)
 //
-// Needs: `npm install` (playwright-core), a Chromium-based browser, and ffmpeg on the PATH. If ffmpeg is
-// missing the frames are saved as numbered PNGs in a folder beside the output, with the command to turn
-// them into a video.
+// Needs: `npm install` (playwright-core, mp4-muxer) and a Chromium-based browser. ffmpeg is optional.
 //
 // Capturing is slow on purpose: allow roughly 1 to 3 s a frame without a GPU, so a 60 s video at the full
 // 62.5 fps (3,750 frames) can take an hour or more. For test runs use a lower --fps, a smaller --width and
@@ -55,6 +58,8 @@ const { values: args } = parseArgs({
     'max-seconds': { type: 'string', default: '0' },
     out: { type: 'string', default: 'video/data-cube.mp4' },
     browser: { type: 'string' },
+    encoder: { type: 'string', default: 'auto' },
+    bitrate: { type: 'string' },
   },
   allowNegative: true,
 });
@@ -72,11 +77,67 @@ const holdFrames = Math.round(Number(args.hold) * fps);
 const maxFrames = Math.round(Number(args['max-seconds']) * fps);
 console.log(`Capturing every ${step === 1 ? 'tick' : `${step}th tick`}: ${fps.toFixed(2)} fps video.`);
 
+const out = resolve(root, args.out);
+mkdirSync(dirname(out), { recursive: true });
+
+// The page that encodes the video in the browser: WebCodecs makes the H.264, mp4-muxer wraps it in an MP4.
+const ENCODER_HTML = `<!doctype html><meta charset="utf-8"><script type="module">
+import { Muxer, ArrayBufferTarget } from '/__muxer.mjs';
+const CODECS = ['avc1.64002a', 'avc1.640032', 'avc1.640028', 'avc1.4d002a'];
+let muxer, encoder, count = 0, frameMicros = 0, keyEvery = 60, failure = null;
+const chunkSizes = [];
+window.startEncoding = async ({ width, height, fps, bitrate }) => {
+  if (typeof VideoEncoder === 'undefined') return null;
+  let codec = null;
+  for (const candidate of CODECS) {
+    const support = await VideoEncoder.isConfigSupported({ codec: candidate, width, height, bitrate, framerate: fps });
+    if (support.supported) { codec = candidate; break; }
+  }
+  if (!codec) return null;
+  muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width, height }, fastStart: 'in-memory' });
+  encoder = new VideoEncoder({ output: (chunk, meta) => { chunkSizes.push(chunk.byteLength); muxer.addVideoChunk(chunk, meta); }, error: (e) => { failure = String(e); } });
+  encoder.configure({ codec, width, height, bitrate, framerate: fps });
+  frameMicros = 1e6 / fps;
+  keyEvery = Math.max(1, Math.round(fps * 2)); // a key frame every two seconds, so players can seek
+  return codec;
+};
+window.addFrame = async (base64) => {
+  const bitmap = await createImageBitmap(await (await fetch('data:image/png;base64,' + base64)).blob());
+  const frame = new VideoFrame(bitmap, { timestamp: Math.round(count * frameMicros), duration: Math.round(frameMicros) });
+  encoder.encode(frame, { keyFrame: count % keyEvery === 0 });
+  frame.close();
+  bitmap.close();
+  count += 1;
+  while (encoder.encodeQueueSize > 6) await new Promise((resolve) => setTimeout(resolve, 5));
+  if (failure) throw new Error(failure);
+};
+window.finishEncoding = async () => {
+  await encoder.flush();
+  muxer.finalize();
+  const buffer = muxer.target.buffer;
+  if (failure) throw new Error(failure);
+  const response = await fetch('/__save', { method: 'POST', body: buffer });
+  if (!response.ok) throw new Error('could not save the video');
+  return { bytes: buffer.byteLength, chunks: chunkSizes };
+};
+</script>`;
+
 // 1. A tiny static server for the repo. With --data, that file is served for every data file the page asks for.
 const customData = args.data ? resolve(args.data).replace(/\.json$/, '.js') : null;
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const server = createServer((req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (req.method === 'POST' && path === '/__save') {
+    const body = [];
+    req.on('data', (chunk) => body.push(chunk));
+    req.on('end', () => { writeFileSync(out, Buffer.concat(body)); res.writeHead(200).end(); });
+    return;
+  }
+  if (path === '/__encoder') { res.writeHead(200, { 'content-type': 'text/html' }).end(ENCODER_HTML); return; }
+  if (path === '/__muxer.mjs') {
+    res.writeHead(200, { 'content-type': 'text/javascript' }).end(readFileSync(join(root, 'node_modules/mp4-muxer/build/mp4-muxer.mjs')));
+    return;
+  }
   const asksForData = /^\/data\/data-cube(-\d+)?\.js$/.test(path);
   const file = customData && asksForData ? customData : join(root, normalize(path === '/' ? '/index.html' : path));
   if (!file.startsWith(root) && file !== customData) { res.writeHead(403).end(); return; }
@@ -129,22 +190,34 @@ await page.waitForFunction(() => globalThis.__dataCube);
 // install() leaves the clock running with real time. Pause it, so time moves only in frame().
 await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
 
-// 3. ffmpeg reads PNG frames from stdin. Without ffmpeg the frames are saved as PNG files instead.
-const out = resolve(root, args.out);
-mkdirSync(dirname(out), { recursive: true });
+// 3. The encoder. ffmpeg reads PNG frames from stdin; failing that, the browser encodes them itself; failing
+// that the frames are saved as PNG files.
 const haveFfmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
 const framesDir = out.replace(/\.[^.]+$/, '') + '-frames';
+let encoder = args.encoder === 'auto' ? (haveFfmpeg ? 'ffmpeg' : 'browser') : args.encoder;
+if (encoder === 'ffmpeg' && !haveFfmpeg) { console.warn('ffmpeg was not found on the PATH.'); encoder = 'browser'; }
 let ffmpeg = null;
 let ffmpegDone = Promise.resolve();
-if (haveFfmpeg) {
+let encoderPage = null;
+if (encoder === 'browser') {
+  const bitrate = Math.round(args.bitrate ? Number(args.bitrate) * 1e6 : Math.max(3e6, width * height * Math.max(fps, 30) * 0.12));
+  const context = await browser.newContext(); // its own clock, so the encoder is not slowed by the fake one
+  encoderPage = await context.newPage();
+  await encoderPage.goto(`http://127.0.0.1:${server.address().port}/__encoder`);
+  await encoderPage.waitForFunction(() => globalThis.startEncoding);
+  const codec = await encoderPage.evaluate((options) => globalThis.startEncoding(options), { width, height, fps, bitrate });
+  if (codec) console.log(`Encoding in the browser: H.264 (${codec}) at ${(bitrate / 1e6).toFixed(1)} Mbit/s.`);
+  else { console.warn("The browser cannot encode H.264 at this size."); encoderPage = null; encoder = 'png'; }
+}
+if (encoder === 'ffmpeg') {
   ffmpeg = spawn('ffmpeg', [
     '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', fps.toFixed(4), '-i', '-',
     '-vf', 'format=yuv420p', '-c:v', 'libx264', '-crf', '14', '-preset', 'slow', '-movflags', '+faststart', out,
   ], { stdio: ['pipe', 'inherit', 'inherit'] });
   ffmpegDone = new Promise((ok, fail) => { ffmpeg.on('close', (c) => (c === 0 ? ok() : fail(new Error(`ffmpeg exited ${c}`)))); });
-} else {
+} else if (encoder === 'png') {
   mkdirSync(framesDir, { recursive: true });
-  console.warn(`ffmpeg was not found, so the frames are saved as PNG files in ${framesDir}`);
+  console.warn(`The frames are saved as PNG files in ${framesDir}`);
 }
 
 let frames = 0;
@@ -160,6 +233,8 @@ async function frame() {
   timing.shot += Date.now() - t1;
   if (ffmpeg) {
     if (!ffmpeg.stdin.write(png)) await new Promise((ok) => ffmpeg.stdin.once('drain', ok));
+  } else if (encoderPage) {
+    await encoderPage.evaluate((base64) => globalThis.addFrame(base64), png.toString('base64'));
   } else {
     writeFileSync(join(framesDir, `frame-${String(frames).padStart(6, '0')}.png`), png);
   }
@@ -222,10 +297,17 @@ if (ffmpeg) {
   ffmpeg.stdin.end();
   await ffmpegDone;
 }
+let videoBytes = 0;
+if (encoderPage) {
+  const done = await encoderPage.evaluate(() => globalThis.finishEncoding());
+  videoBytes = done.bytes;
+  const sizes = done.chunks;
+  console.log(`Encoded ${sizes.length} frames; the biggest was ${Math.max(...sizes)} bytes and the median ${[...sizes].sort((a, b) => a - b)[Math.floor(sizes.length / 2)]}.`);
+}
 await browser.close();
 server.close();
-if (ffmpeg) {
-  console.log(`Wrote ${out}: ${frames} frames, ${(frames * rafMs / 1000).toFixed(1)} s of animation.`);
+if (ffmpeg || encoderPage) {
+  console.log(`Wrote ${out}: ${frames} frames, ${(frames * rafMs / 1000).toFixed(1)} s of animation${videoBytes ? `, ${(videoBytes / 1e6).toFixed(1)} MB` : ''}.`);
 } else {
   console.log(`Wrote ${frames} frames to ${framesDir}. Install ffmpeg, then make the video with:\n  ffmpeg -framerate ${fps.toFixed(4)} -i "${join(framesDir, 'frame-%06d.png')}" -vf format=yuv420p -c:v libx264 -crf 14 "${out}"`);
 }
