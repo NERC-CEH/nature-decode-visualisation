@@ -9,6 +9,12 @@
 
 import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs';
 import * as esbuild from 'esbuild-wasm';
+import { fileURLToPath } from 'node:url';
+
+// The child process that runs esbuild-wasm loads a small fix for machines where its random numbers fail
+// (see scripts/lib/entropy-fix.cjs).
+const fix = fileURLToPath(new URL('./lib/entropy-fix.cjs', import.meta.url));
+process.env.NODE_OPTIONS = [process.env.NODE_OPTIONS, '--require', JSON.stringify(fix)].filter(Boolean).join(' ');
 
 const OUT = 'dist/app.js';
 const BANNER = '/* Our planet. Decoded. Built from src/ by scripts/build.mjs. Do not edit. */';
