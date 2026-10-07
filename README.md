@@ -62,6 +62,20 @@ Cube sizes from 5 to 12 are supported. `npm run data:all` makes all eight: the d
 `data/data-cube.json`, and the others are `data/data-cube-5.json`, `data-cube-6.json` and so on. The page
 picks the file from `?size=N` (`data/load-data.js`). `npm run check` checks every size.
 
+## Making a video
+
+`npm run video` plays the whole story and records it frame by frame, so the video is perfectly smooth
+however slowly the machine renders. It needs ffmpeg on the PATH (without it the frames are saved as PNG
+files, with the command to make the video) and a Chromium-based browser (the installed Edge or Chrome is
+found automatically; `--browser path` names another). The result is `video/data-cube.mp4`.
+
+```
+npm run video                                    # 1920 x 1080 at 62.5 fps, size 9 (slow: allow an hour or more)
+npm run video -- --size 7 --width 960 --height 540 --fps 15.6 --max-seconds 20 --out video/test.mp4
+```
+
+Options are listed at the top of `scripts/capture-video.mjs`.
+
 ## Brand assets
 
 The code is MIT licensed (see `LICENSE`). The UKCEH logo files in `docs/` and the brand
