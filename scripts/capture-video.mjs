@@ -223,9 +223,26 @@ if (encoder === 'ffmpeg') {
 let frames = 0;
 const timing = { advance: 0, shot: 0 };
 const started = Date.now();
+// Drawing is the slow part when there is no GPU, and only the last tick of each captured frame is ever
+// seen. So the page's scene.render() is switched off for the other ticks. Everything else (physics,
+// tweens, the caption) still runs on every tick.
+await page.evaluate(() => {
+  const scene = globalThis.__dataCube.ctx.scene;
+  if (!scene) return;
+  const draw = scene.render.bind(scene);
+  globalThis.__draw = true;
+  scene.render = () => { if (globalThis.__draw) draw(); };
+});
 async function frame() {
   const t0 = Date.now();
-  await page.clock.runFor(rafMs);
+  if (rafMs > tickMs) {
+    await page.evaluate(() => { globalThis.__draw = false; });
+    await page.clock.runFor(rafMs - tickMs);
+    await page.evaluate(() => { globalThis.__draw = true; });
+    await page.clock.runFor(tickMs);
+  } else {
+    await page.clock.runFor(rafMs);
+  }
   await page.evaluate(() => globalThis.__stepAnimations());
   const t1 = Date.now();
   const png = await page.screenshot({ type: 'png', timeout: 0 });
