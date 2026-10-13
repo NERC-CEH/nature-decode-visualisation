@@ -19,7 +19,8 @@
 //                      still advances in its normal 16 ms ticks (physics and tweens are unchanged),
 //                      but only every Nth tick is photographed, and the video plays at real speed.
 //   --hold 3           seconds to hold on each step once everything on it has appeared
-//   --sweep / --no-sweep   move the cursor through the cubes during Data, Categorise and Sort (on)
+//   --sweep            move the cursor through the cubes during Data, Categorise and Sort, pushing them as a
+//                      visitor would (off by default; no cursor is drawn)
 //   --data file.json   use this data file instead of the ones in data/ (its .js sits alongside)
 //   --max-seconds 0    stop after this many seconds of video (0 = the whole story), for test runs
 //   --out video/data-cube.mp4
@@ -53,7 +54,7 @@ const { values: args } = parseArgs({
     height: { type: 'string', default: '1080' },
     fps: { type: 'string', default: '62.5' },
     hold: { type: 'string', default: '3' },
-    sweep: { type: 'boolean', default: true },
+    sweep: { type: 'boolean', default: false },
     data: { type: 'string' },
     'max-seconds': { type: 'string', default: '0' },
     out: { type: 'string', default: 'video/data-cube.mp4' },
