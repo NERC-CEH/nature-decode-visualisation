@@ -36,7 +36,7 @@ Navigation is **Next** and **Back** only. Each press plays an animation forward 
 | Tooltips | None. Dropped. |
 | Sound | Stretch goal: plastic clacks on impacts, plus sounds for a tag appearing, a slide change, the cube turning and the move to the finale. Mute control, unlocked by a tap. |
 | Hosting | For now the page is only ever run locally (double-click `index.html`); the repository is private. GitHub Pages was the plan and is deferred until a public launch, so it is not enabled. Fully offline: no CDN. |
-| Mobile | Stretch goal. Landscape only: a phone held upright is asked to turn. Buttons only. 7 × 7 × 7 data by default on phones. Plan in 13.1. |
+| Mobile | Built. Landscape only: a phone held upright is asked to turn. Buttons only. 7 × 7 × 7 data by default on phones. Plan in 13.1. |
 | Data size | 9 × 9 × 9 by default. 10 is comfortable; 12 shows a slight lag on a laptop. `?size=5` to `?size=12` picks another (built, 13.1). |
 | Captions | Along the bottom, over a full-height canvas. The order on each step is title, then tags and labels, then the caption text (7.9). |
 | Accessibility | Keyboard navigation and text alternatives (11). Reduced motion is built but switched off (11). |
@@ -227,7 +227,7 @@ Within a step, the title fades in over 1.4 s, the tags start 0 s after that, and
 | 1 | **Data** | Black cubes pour from above the frame in a narrow stream into the middle of the floor, over 2 s. They land in a heap and tumble outward across the floor. One tag on a cube at the top right of the pile. | Cursor or touch repels cubes. |
 | 2 | **Categorise** | Each cube takes its species colour, in random order. Cubes stay put. One tag. | Cursor repels cubes. |
 | 3 | **Sort** | The cubes are thrown apart and frozen in the air, then pulled to one spot per species, spread across the floor in display order (in two alternating rows), and pile into heaps there. Tags on the back left and back right heaps. | Cursor repels cubes. |
-| 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box fades in. Four tags (the corner of the cube, then one for each axis), each bringing in its axis title. | Drag to rotate. Spring back. |
+| 4 | **Arrange** | Each heap lifts in turn and its cubes fly to their cells in that species' sheet. The wireframe box fades in. One tag at the corner of the cube ("Each observation can be placed in the data cube according to where it was (Location), when it was (Time), and what it was (Species)."), bringing in all three axis titles. | Drag to rotate. Spring back. |
 | 5 | **Insights 1** | The cube turns to the side face. Boxes round the top two rows (the specialists) and the bottom two (the generalists), each with a label. | Drag to rotate. Spring back. |
 | 6 | **Insights 2** | Turns to the top face. Cubes are opaque and coloured by how many are in their column, blue to red (7.4). Two tags off the sides of the box. | As above. |
 | 7 | **Insights 3** | Turns to the front face. Boxes round the bottom and top two rows with labels. | As above. |
@@ -417,7 +417,7 @@ Each milestone ends with a review. Each step milestone includes the step's **rev
 ### 13.1 Stretch plan
 
 - **Selectable size (built):** `npm run data:all` makes one story-checked cube for each size from 5 to 12 (`data/data-cube-N.*`, with 9 as `data/data-cube.*`); `?size=N` picks one (default 9) through `data/load-data.js`, which writes a script tag for that file, so `file://` keeps working. Sizes outside 5 to 12 fall back to 9. Phones will default to 7 (mobile work).
-- **Mobile:** landscape only, with a "please turn your phone" prompt over the paused animation when held upright (and a landscape lock where the browser allows it). Default size 7 on phones. Touch drag repels and rotates (`touch-action: none`). A compact caption band on short screens, scaled callouts, quality tiers with a frame-time monitor, no swipe navigation, plain web (no installable page). Target: a mid-range Android phone at 30 fps.
+- **Mobile (built):** `src/device.js` and `data/load-data.js` detect a phone (touch screen, short side 500 px or less). Landscape only, with a "please turn your phone" prompt over the paused animation when held upright (and a landscape lock where the browser allows it). Default size 7 on phones. Touch drag repels and rotates (`touch-action: none`). A compact caption band on short screens, scaled callouts, quality tiers with a frame-time monitor, no swipe navigation, plain web (no installable page). `src/quality.js` starts a phone a tier down (pixel ratio, shadow map) and steps down again if frames average slower than 28 fps; it never steps back up. Target: a mid-range Android phone at 30 fps (not yet tried on a real device).
 - **Sound:** Web Audio with small embedded samples: impact clacks, a tag appearing, a slide change, the cube turning, the move to the finale. Mute control; the first tap unlocks audio.
 - Dropped: tooltips, poster export, a Rapier physics swap.
 

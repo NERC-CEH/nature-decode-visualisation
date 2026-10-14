@@ -16,7 +16,10 @@ html, body {
   background: var(--bg);
   color: var(--fg);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
+  /* 16px up to a 1900 px wide window, then growing with it, so text does not go tiny on a big screen
+     (a kiosk display, say). Phones and tablets report their size in CSS pixels, already allowing for
+     their dense screens, so they keep 16px. Everything sized in rem follows, and so do the tags (callout.js). */
+  font-size: clamp(16px, 0.85vw, 40px);
   line-height: 1.5;
 }
 
@@ -26,6 +29,7 @@ html, body {
   grid-template-rows: minmax(0, 1fr) var(--band-h);
   height: 100vh;
   height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Stage: the 3D canvas, the intro text over it, and status messages */
@@ -55,6 +59,8 @@ html, body {
 }
 .is-intro .kiosk-start { display: block; }
 .kiosk-start[hidden] { display: none; }
+/* Playing by itself is for a screen on a stand, not a phone in the hand (?kiosk still works) */
+.is-phone .kiosk-start { display: none !important; }
 .kiosk-status {
   flex: 1;
   margin: 0;
@@ -83,6 +89,7 @@ html, body {
   outline-offset: -3px;
 }
 .canvas-wrap {
+  touch-action: none; /* a finger on the stage pushes the cubes or turns the cube; it does not scroll the page */
   position: absolute;
   top: 0;
   bottom: calc(-1 * var(--band-h));
@@ -277,7 +284,8 @@ button:focus-visible {
 
 .noscript { padding: 24px; }
 
-@media (max-width: 760px) {
+/* a narrow, tall window (landscape phones are handled below) */
+@media (max-width: 760px) and (min-height: 501px) {
   :root { --band-h: 16rem; }
   .caption { width: 100%; padding: 8px 16px 0; height: 10rem; }
   .caption-body { grid-template-columns: minmax(0, 1fr); gap: 4px; align-content: center; }
@@ -386,3 +394,74 @@ button:focus-visible {
   font-size: 1.125rem;
 }
 .fallback[hidden] { display: none; }
+
+/* A phone on its side (or any short, wide window): a slim band along the bottom, the caption at the left
+   and the progress marks and buttons at the right, so the 3D view keeps most of the height */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --band-h: 6.5rem; }
+  .caption { width: calc(100% - 13.5rem); height: calc(var(--band-h) - 1.5rem); padding: 4px 16px 0; } /* the bottom line is for the footnote */
+  /* the title (and the insight marks under it) at the left and the text beside them, as on a big screen */
+  .caption-body { gap: 2px 16px; }
+  .caption-body h2 { font-size: 1.25rem; }
+  .caption-body #caption-text { max-width: none; font-size: 0.75rem; line-height: 1.25; }
+  .insight-indicator { font-size: 0.75rem; }
+  .is-statement .caption { width: 100%; }
+  .is-statement .caption-body h2 { max-width: 80vw; font-size: 1.25rem; }
+  .controls { padding: 0 16px 8px; }
+  .caption-controls { gap: 8px; }
+  button { min-width: 5.25rem; padding: 6px 14px; }
+  .progress { gap: 4px; }
+  .progress li { width: 10px; height: 10px; }
+  .hero h1 { font-size: clamp(1.75rem, 6vw, 3rem); margin-bottom: 0.75rem; }
+  .hero-logo { width: min(20vw, 140px); }
+  .kiosk-start { bottom: 0.25rem; min-height: 36px; }
+  :root:not(.is-phone) .is-intro .hero { padding-bottom: 2.5rem; }
+  .axis-label { font-size: 1.1rem; }
+  .callout-label { font-size: 0.8125rem; }
+}
+
+/* A phone held upright is asked to turn (see device.js). It covers everything. */
+.turn-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--fg);
+  text-align: center;
+  font-size: 1.25rem;
+}
+.turn-prompt[hidden] { display: none; }
+.turn-prompt { flex-direction: column; gap: 1.5rem; }
+.turn-prompt p { margin: 0; }
+/* A phone-shaped box that stands upright, turns on its side, holds, and turns back */
+.turn-icon {
+  width: 44px;
+  height: 76px;
+  border: 3px solid var(--fg);
+  border-radius: 8px;
+  position: relative;
+  animation: turn-phone 3s ease-in-out infinite;
+}
+.turn-icon::after { /* the speaker slot, which shows which way up it is */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 14px;
+  height: 3px;
+  margin-left: -7px;
+  border-radius: 2px;
+  background: var(--fg);
+}
+@keyframes turn-phone {
+  0%, 15% { transform: rotate(0deg); }
+  45%, 70% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-icon { animation: none; transform: rotate(-90deg); }
+}

@@ -17,14 +17,15 @@ const toRadians = (degrees) => (degrees * Math.PI) / 180;
 const FIT = { x: 0.94, y: 0.9 }; // the arena fills this much of the view
 const BASE_FOV = 35; // degrees; the floor and cube views use this, the face views narrow it
 
-export function createScene(container, stageElement = container) {
+export function createScene(container, stageElement = container, { tier = { pixelRatio: 2, shadowMap: 1024 }, antialias = true } = {}) {
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias });
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const setPixelRatio = (max) => renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, max));
+  setPixelRatio(tier.pixelRatio);
   renderer.shadowMap.enabled = true;
   container.appendChild(renderer.domElement);
 
@@ -40,8 +41,8 @@ export function createScene(container, stageElement = container) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 2.2);
   sun.position.set(-8, 22, 12);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.castShadow = tier.shadowMap > 0;
+  sun.shadow.mapSize.set(tier.shadowMap || 1, tier.shadowMap || 1);
   sun.shadow.bias = -0.0005;
   scene.add(sun);
 
@@ -239,6 +240,15 @@ export function createScene(container, stageElement = container) {
     setCubeFrame(size) { frame = size; refit(); },
     get spawnY() { return spawnY; },
     setClearColour: (hex) => renderer.setClearColor(hex),
+    // Change the pixel ratio and shadows to a quality tier (see quality.js).
+    setQuality(next) {
+      setPixelRatio(next.pixelRatio);
+      sun.castShadow = next.shadowMap > 0;
+      sun.shadow.mapSize.set(next.shadowMap || 1, next.shadowMap || 1);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+      resize();
+    },
 
     // The size of the stage in pixels and how big a pixel is, in world units, at the middle of the
     // cube in the face view (which is where the finale puts the logo).

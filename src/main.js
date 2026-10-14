@@ -21,6 +21,8 @@ import { createUi } from './ui.js';
 import { createCallout, pickTopRight } from './callout.js';
 import { reducedMotion } from './motion.js';
 import { createKiosk, listenForInput } from './kiosk.js';
+import { isPhone, watchTurn, lockLandscape } from './device.js';
+import { createQuality } from './quality.js';
 
 const steps = buildSteps(STEPS);
 const ui = createUi({
@@ -45,7 +47,11 @@ try {
   throw error;
 }
 
-const scene = createScene(document.getElementById('canvas-wrap'), document.querySelector('.stage'));
+const phone = isPhone();
+document.documentElement.classList.toggle('is-phone', phone); // styles.css hides "Play automatically" on a phone
+// The renderer starts at a tier that suits the device and drops a tier if frames run slow (see quality.js).
+const quality = createQuality({ phone, onChange: (tier) => scene?.setQuality(tier) });
+const scene = createScene(document.getElementById('canvas-wrap'), document.querySelector('.stage'), { tier: quality.tier, antialias: !phone });
 if (!scene) ui.showNoWebGL();
 
 // One theme value drives the CSS variables and the 3D clear colour together.
@@ -137,6 +143,13 @@ const locate = (i) => {
   const p = field?.positionOf(i);
   return p ? scene.toStage(p) : null;
 };
+// Where the axis titles are on the stage, so a label can keep clear of them.
+function axisTitleBoxes() {
+  const layer = document.getElementById('callouts').getBoundingClientRect();
+  return [...document.querySelectorAll('.axis-label')].map((e) => e.getBoundingClientRect())
+    .filter((r) => r.width > 0)
+    .map((r) => ({ left: r.left - layer.left - 6, right: r.right - layer.left + 6, top: r.top - layer.top - 6, bottom: r.bottom - layer.top + 6 }));
+}
 // Each tag line and label is its own callout; a step's list plays one after another.
 const callouts = scene && field
   ? [0, 1, 2, 3].map((n) => createCallout({
@@ -144,7 +157,8 @@ const callouts = scene && field
     locate,
     pick: () => -1,
     obstacles: () => cube.cubes.map((_, i) => locate(i)),
-    others: () => callouts.filter((_, k) => k !== n).map((c) => c.occupied()),
+    others: () => [...callouts.filter((_, k) => k !== n).map((c) => c.occupied()), ...axisTitleBoxes()],
+    lines: () => callouts.filter((_, k) => k !== n).map((c) => c.segment()),
   }))
   : [];
 let pendingCallouts = null;
@@ -223,7 +237,7 @@ function startCallouts(step) {
       ...(side ? { region: () => rowsRegion(target, anchor), side, outline } : {}),
       delay: n === 0 ? undefined : (delay ?? 0),
       onLabel: () => {
-        if (reveal) frame?.showAxis(reveal, CALLOUT.labelFade);
+        for (const axis of [reveal ?? []].flat()) frame?.showAxis(axis, CALLOUT.labelFade);
         ui.announce(text); // for screen readers: each label is read as it comes in
       },
       pick: () => {
@@ -322,11 +336,25 @@ if (location.search.includes('debug')) {
   };
 }
 
+// A phone held upright is asked to turn; the animation waits behind the prompt.
+let waitingForTurn = false;
+const turnPrompt = document.getElementById('turn-prompt');
+watchTurn((needed) => {
+  waitingForTurn = needed;
+  if (turnPrompt) turnPrompt.hidden = !needed;
+  document.getElementById('app')?.toggleAttribute('inert', needed);
+});
+// Browsers only allow a landscape lock after a tap (and often only in full screen); try on the first one.
+document.addEventListener('pointerdown', () => lockLandscape(), { once: true });
+
 let last = performance.now();
 function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
-  if (!paused) update(dt);
+  if (!paused && !waitingForTurn) {
+    update(dt);
+    quality.frame(dt);
+  }
   scene?.render();
   requestAnimationFrame(loop);
 }

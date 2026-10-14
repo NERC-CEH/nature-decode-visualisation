@@ -48,6 +48,9 @@ function shadowDepthMaterial(getFadeTop) {
 
 // `scene` is a THREE.Scene. `cubes` is the list from loadCube(). `getSpawnY` returns the height
 // above the visible frame to release cubes from.
+// The opacity from which the cubes are treated as solid when they are drawn (see blendTo).
+const NEARLY_SOLID = 0.85;
+
 export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () => 20 }) {
   const count = cubes.length;
   const material = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 });
@@ -446,7 +449,7 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
       const alphaFrom = material.opacity;
       if (alpha < 1 || alphaFrom < 1) {
         material.transparent = true;
-        material.depthWrite = false;
+        material.depthWrite = alphaFrom >= NEARLY_SOLID;
         material.needsUpdate = true;
       }
       recolouring = tween({
@@ -454,6 +457,9 @@ export function createCubeField({ scene, physics, cubes, arena, getSpawnY = () =
         easing: ease.inOutQuad,
         onUpdate: (t) => {
           material.opacity = alphaFrom + (alpha - alphaFrom) * t;
+          // The cubes are one mesh, drawn in a fixed order, not back to front. Nearly solid, they write depth so
+          // that near cubes hide far ones whatever the order; only really see-through ones skip it, and blend.
+          material.depthWrite = material.opacity >= NEARLY_SOLID;
           for (let i = 0; i < count; i++) mesh.setColorAt(i, colour.copy(from[i]).lerp(to[i], t));
           mesh.instanceColor.needsUpdate = true;
         },

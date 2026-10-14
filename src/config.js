@@ -304,11 +304,12 @@ export const STEPS = [
     text: 'Data cubes are a bit like a pile of spreadsheets, one on top of another. Arranging the data in this way allows us to look for patterns in the data that might give us a clue about how species populations are changing.',
     theme: 'light',
     callout: [
-      { target: 'cubeTopRight', text: 'We can put all our wildlife observations into a data cube.' },
-      // `reveal` fades in an axis title with its label; `delay` is the wait after the label before it
-      { target: 'leftmost', text: "Each layer going up is one species' data.", reveal: 'species', delay: 1 },
-      { target: 'rightmostBack', text: 'Each layer going back is a different location.', reveal: 'location', delay: 1 },
-      { target: 'lowest', text: 'Each slice going left to right is a different year.', reveal: 'time', delay: 1 },
+      // `reveal` fades in the named axis titles with the label
+      {
+        target: 'cubeTopRight',
+        text: 'Each observation can be placed in the data cube according to where it was (Location), when it was (Time), and what it was (Species).',
+        reveal: ['location', 'time', 'species'],
+      },
     ],
     calloutWhenReady: true,
     canvasLabel: 'The cubes arrange into a three-dimensional data cube with axes for species, location and time. Drag to rotate it.',
