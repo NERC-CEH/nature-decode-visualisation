@@ -3,3 +3,13 @@ docs/UKCEH_Brand_Logo.pdf
 docs/sketches.pdf
 node_modules/
 video/
+
+# Funding application working files (kept local)
+SHEF/
+
+# PowerPoint files
+*.pptx
+*.ppt
+*.pptm
+*.potx
+*.ppsx
