@@ -4,14 +4,18 @@ An interactive 3D animation that shows how scattered records of wildlife become 
 (species × location × time) that reveals patterns in nature. It rebuilds the
 [physical data cube](https://digitalenvironment.org/building-a-physical-data-cube/) as a web page.
 
+<video src="docs/data-cube.mp4" controls muted width="100%"></video>
+
+Prefer to try it yourself? Open the [live version](https://tomaugust.github.io/nature-decode-visualisation/).
+
 Status: every step of the animation works, from the opening screen to the logo and Restart, with tag
 lines and labels that point at the data. Kiosk mode, keyboard and screen-reader support and a data size selector are done. Still to do: a final
 README and checks (M8), then a landscape mobile version. See [docs/technical-spec.md](docs/technical-spec.md).
 
 ## Run it
 
-Open `index.html` in a browser. It needs no server and no internet connection. It is run locally only for
-now: the repository is private and GitHub Pages is not turned on.
+Open `index.html` in a browser. It needs no server and no internet connection. The `main` branch is also
+published with GitHub Pages (see [Publishing](#publishing)).
 
 Kiosk mode makes the story play itself, for a screen at an event. Click "Play automatically" on the
 opening screen, or add `?kiosk` to the address to start it at once. Any key, click, touch or mouse
@@ -39,7 +43,7 @@ npm run check    # build check, tests, data story check, palette check
 ```
 
 `dist/app.js` is built from `src/` and is committed, so the page runs straight from the repository
-and from GitHub Pages if that is ever turned on (it is not: the repository is private and the page is only run locally for now). Run `npm run build` after changing anything in `src/`. `npm run check` (and
+and from GitHub Pages. Run `npm run build` after changing anything in `src/`. `npm run check` (and
 the GitHub Action) fails if the committed bundle is out of date.
 
 ### Changing the data
@@ -80,6 +84,13 @@ to move the mouse back and forth over the floor during Data, Categorise and Sort
 as they are when a visitor moves the cursor (no cursor is drawn).
 
 Options are listed at the top of `scripts/capture-video.mjs`.
+
+## Publishing
+
+Every push to `main` deploys the page to GitHub Pages (`.github/workflows/pages.yml`). To turn it on once,
+go to the repository's Settings, then Pages, and set Source to "GitHub Actions". After that the workflow
+publishes `index.html`, `styles.css`, `assets/`, `data/` and `dist/` and the address appears in the
+workflow run.
 
 ## Brand assets
 
