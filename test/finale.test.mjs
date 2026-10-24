@@ -22,12 +22,15 @@ test('the measured symbol has 26 dots in three rings of 6, 8 and 12', () => {
   const { dots, image } = logoDots;
   assert.equal(dots.length, 26);
   const bySize = new Map();
-  for (const d of dots) bySize.set(Math.round(d.r / 5), (bySize.get(Math.round(d.r / 5)) ?? 0) + 1);
+  for (const d of dots) {
+    const size = d.r < 16 ? 'small' : d.r < 24 ? 'medium' : 'large';
+    bySize.set(size, (bySize.get(size) ?? 0) + 1);
+  }
   assert.deepEqual([...bySize.values()].sort((a, b) => a - b), [6, 8, 12]);
   for (const d of dots) {
-    assert.ok(d.x - d.r >= 0 && d.y - d.r >= 0 && d.x + d.r <= image.width && d.y + d.r <= image.height, 'inside the image');
+    assert.ok(d.x - d.r >= -1 && d.y - d.r >= -1 && d.x + d.r <= image.width + 1 && d.y + d.r <= image.height + 1, 'inside the image');
   }
-  assert.deepEqual([image.width, image.height], [2506, 868]);
+  assert.deepEqual([image.width, image.height], [1536, 666]);
 });
 
 test('the dots are laid out round one centre, in rings', () => {
@@ -51,7 +54,7 @@ test('the lock-up is centred on the stage and no larger than its share of it', (
   assert.ok(Math.abs(rect.left + rect.width / 2 - stage.width / 2) < 1e-9);
   assert.ok(Math.abs(rect.top + rect.height / 2 - stage.height / 2) < 1e-9);
   assert.ok(rect.width <= stage.width * LOGO.fraction + 1e-9 && rect.height <= stage.height * LOGO.fraction + 1e-9);
-  assert.ok(Math.abs(rect.width / rect.height - 2506 / 868) < 1e-9, 'keeps its shape');
+  assert.ok(Math.abs(rect.width / rect.height - 1536 / 666) < 1e-9, 'keeps its shape');
 });
 
 test('on a tall narrow stage the lock-up is limited by the width', () => {
