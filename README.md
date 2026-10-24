@@ -4,7 +4,9 @@ An interactive 3D animation that shows how scattered records of wildlife become 
 (species × location × time) that reveals patterns in nature. It rebuilds the
 [physical data cube](https://digitalenvironment.org/building-a-physical-data-cube/) as a web page.
 
-<video src="docs/data-cube.mp4" controls muted width="100%"></video>
+[![Watch the video: the animation from scattered records to a data cube](docs/data-cube-poster.png)](docs/data-cube.mp4)
+
+*Click the image to watch the video (97 seconds).*
 
 Prefer to try it yourself? Open the [live version](https://tomaugust.github.io/nature-decode-visualisation/).
 
