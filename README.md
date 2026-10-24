@@ -28,6 +28,19 @@ The page always plays the full animation: it does not follow the system's reduce
 reduced version (quick fades, no physics to watch) exists and is used only if the address has
 `?motion=reduced`.
 
+## Sound
+
+The page has sound: soft plastic clacks and thuds when cubes touch, small cues for the tags, the slide
+between steps, the cube turning and the finale, and a quiet bed (a pad with a few sparse notes) that
+follows the story. Everything is synthesised in the browser with [Tone.js](https://tonejs.github.io/); there
+are no audio files, and nothing needs the internet.
+
+Sound starts with the first click or key press (browsers do not allow it before) and the first few
+seconds draw the sounds in the background. The Sound button at the top right mutes it. Kiosk mode (`?kiosk`
+or "Play automatically") starts muted; pressing Sound there turns it on and keeps it on. The sounds and
+the bed per step are `BED` and `SOUND` in `src/config.js`; the synthesis is in `src/audio/`.
+`?audiolog` plays nothing and logs each sound with its time instead, which is how the video gets its sound.
+
 Add `?size=N` to the address to change the size of the data cube, from 5 to 12 per side (default 9),
 for example `index.html?size=7`. 10 runs comfortably; 12 may lag on a laptop.
 
@@ -73,7 +86,7 @@ picks the file from `?size=N` (`data/load-data.js`). `npm run check` checks ever
 `npm run video` plays the whole story and records it frame by frame, so the video is perfectly smooth
 however slowly the machine renders. It needs a Chromium-based browser (the installed Edge or Chrome is
 found automatically; `--browser path` names another). The video is made by the browser's own H.264 encoder,
-so nothing else needs installing; if ffmpeg is on the PATH it is used instead (`--encoder ffmpeg`), or
+so nothing else needs installing (ffmpeg is still needed to add the sound); if ffmpeg is on the PATH it is used instead (`--encoder ffmpeg`), or
 `--encoder png` saves numbered PNG files. The result is `video/data-cube.mp4`.
 
 ```
@@ -84,6 +97,11 @@ npm run video -- --size 7 --width 960 --height 540 --fps 15.6 --max-seconds 20 -
 The video is not recorded in kiosk mode, and the cubes are left alone: nothing pushes them. Add `--sweep`
 to move the mouse back and forth over the floor during Data, Categorise and Sort, so the cubes are pushed
 as they are when a visitor moves the cursor (no cursor is drawn).
+
+The video has sound. The page runs with `?audiolog`, which logs every sound it would have played
+with its time on the virtual clock, and when the capture ends the same synthesis draws that list into
+`video/data-cube.wav` (in a second browser) and ffmpeg adds it to the video. Without ffmpeg the WAV file is
+kept and the command to add it is printed. `--no-audio` makes a silent video.
 
 Options are listed at the top of `scripts/capture-video.mjs`.
 

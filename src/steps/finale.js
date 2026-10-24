@@ -22,6 +22,7 @@ export const finaleStep = {
     logo.place(layout.rect);
     // First the cubes that are not needed fade away, then the rest fly to the dots.
     await field.fadeOut(removed, DURATIONS.finaleFade);
+    ctx.audio?.finale(); // the notes climb as the cubes fly to the logo
     await Promise.all([
       ctx.setTheme('dark', DURATIONS.finale),
       field.blendTo((i) => speciesColour(cube.cubes[i].species), 1, DURATIONS.finale / 3),

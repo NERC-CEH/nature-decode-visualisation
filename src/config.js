@@ -383,3 +383,40 @@ export const STEPS = [
     canvasLabel: 'The cubes form the dots of the UKCEH logo. Our planet. Decoded.',
   },
 ];
+
+// Sound (src/audio). The bed is one looping pad per step, with a few bell notes. `loop` is its length in
+// seconds, `tail` the reverb tail drawn past the end and folded back onto the start, `rms` its level in dBFS
+// (about 12 dB below the sound effects). Per step: `notes` the pad, `tex` the bells per loop, `air` the
+// breath of noise, `level` an offset in dB, `seed` which bells fall when.
+export const BED = {
+  loop: 10,
+  tail: 5,
+  sampleRate: 22050, // the bed is soft and low, so it is drawn at half rate to save time
+  rms: -34,
+  bells: ['A4', 'C5', 'E5', 'G5', 'A5', 'C6'],
+  steps: {
+    intro: { notes: ['A2', 'E3'], tex: 0, air: 0.35, level: -6, seed: 1 },
+    data: { notes: ['A2', 'E3', 'A3'], tex: 5, air: 0.6, level: 0, seed: 2 },
+    categorise: { notes: ['A2', 'E3', 'A3'], tex: 7, air: 0.6, level: 0, seed: 3 },
+    sort: { notes: ['A2', 'E3', 'A3', 'C4'], tex: 8, air: 0.6, level: 0.5, seed: 4 },
+    arrange: { notes: ['A2', 'E3', 'A3', 'C4'], tex: 3, air: 0.4, level: -1.5, seed: 5 },
+    insight1: { notes: ['A2', 'E3', 'A3', 'C4', 'E4'], tex: 2, air: 0.3, level: -1, seed: 6 },
+    insight2: { notes: ['A2', 'E3', 'G3', 'C4', 'E4'], tex: 2, air: 0.3, level: -1, seed: 7 },
+    insight3: { notes: ['A2', 'E3', 'B3', 'E4', 'G4'], tex: 2, air: 0.3, level: -1, seed: 8 },
+    conclusion: { notes: ['A2', 'E3', 'A3', 'C4', 'E4', 'A4'], tex: 2, air: 0.3, level: 0, seed: 9 },
+    finale: { notes: ['A2', 'E3', 'A3', 'C4', 'E4', 'A4'], tex: 0, air: 0.2, level: -1, seed: 10 },
+  },
+  crossfade: 2.5, // seconds between one step's bed and the next
+  finaleFadeAt: 3.5, // seconds into the finale when the bed starts to fade out...
+  finaleFade: 5, // ...over this many seconds
+};
+
+export const SOUND = {
+  master: 0.35, // overall level, 0 to 1
+  voices: 14, // most sound effects playing at once
+  impactMinSpeed: 1.2, // slower contacts make no sound (cube units a second)
+  impactFullSpeed: 9, // contacts at or above this speed are played at full strength
+  impactGap: 0.012, // fewest seconds between two impacts that make a sound
+  duckDb: -2, // the bed dips this far under a hard impact...
+  duckAbove: 0.6, // ...when its strength (0 to 1) is at least this
+};

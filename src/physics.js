@@ -22,6 +22,7 @@ export function createPhysics(settings = PHYSICS) {
   const bodies = [];
   const walls = [];
   const hooks = [];
+  const impactListeners = [];
   let accumulator = 0;
 
   return {
@@ -56,6 +57,16 @@ export function createPhysics(settings = PHYSICS) {
         sleepSpeedLimit: 0.15,
         sleepTimeLimit: 0.5,
       });
+      // Report each contact's speed: 'ground' for a cube on the floor or a wall, 'cube' for two cubes
+      // (reported once, by the cube with the lower id).
+      body.addEventListener('collide', (event) => {
+        if (!impactListeners.length) return;
+        const other = event.body;
+        const ground = other.type === CANNON.Body.STATIC;
+        if (!ground && other.id < body.id) return;
+        const speed = Math.abs(event.contact.getImpactVelocityAlongNormal());
+        for (const fn of impactListeners) fn(ground ? 'ground' : 'cube', speed);
+      });
       body.position.set(position.x, position.y, position.z);
       if (quaternion) body.quaternion.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
       world.addBody(body);
@@ -67,6 +78,11 @@ export function createPhysics(settings = PHYSICS) {
       world.removeBody(body);
       const i = bodies.indexOf(body);
       if (i >= 0) bodies.splice(i, 1);
+    },
+
+    // Call `fn(kind, speed)` whenever cubes touch ('cube' or 'ground'), speed in cube edges a second.
+    onImpact(fn) {
+      impactListeners.push(fn);
     },
 
     // Run `fn(stepSeconds)` before every fixed step of step(), so forces that act on the cubes

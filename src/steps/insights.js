@@ -47,6 +47,7 @@ export async function showFace(ctx, face) {
     frame?.fadeTitlesTo(0, 0.2),
   ]);
   // Phase 2: rotate the cube while zooming in and blending colours
+  ctx.audio?.turn();
   rotation.setTarget({ yaw: face.yaw, pitch: face.pitch });
   await Promise.all([
     scene?.setView('face', FACE.turn - FACE.pullBack),
@@ -67,6 +68,7 @@ export async function backToCube(ctx, { restoreTitles = true } = {}) {
     scene?.setView('cube', FACE.pullBack, FACE.pullBackShare),
   ]);
   // Phase 2: rotate back while zooming in and restoring colours
+  ctx.audio?.turn();
   rotation.setTarget({ yaw: CUBE.yaw, pitch: CUBE.tilt });
   await Promise.all([
     scene?.setView('cube', FACE.turn - FACE.pullBack),

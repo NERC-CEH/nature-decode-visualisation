@@ -23,8 +23,20 @@ import { reducedMotion } from './motion.js';
 import { createKiosk, listenForInput } from './kiosk.js';
 import { isPhone, watchTurn, lockLandscape } from './device.js';
 import { createQuality } from './quality.js';
+import { createAudio } from './audio/index.js';
+import * as synth from './audio/synth.js';
 
 const steps = buildSteps(STEPS);
+// Sound. Kiosk mode starts muted; ?audiolog plays nothing and logs the sound events instead, for the video.
+const eventMode = /[?&]kiosk(?:&|$)/.test(location.search);
+const audio = createAudio({
+  synth,
+  log: /[?&]audiolog(?:&|$)/.test(location.search),
+  stepIds: STEPS.map((s) => s.id),
+  muted: eventMode,
+  onChange: (muted) => ui.setSoundState(muted),
+});
+audio.step(STEPS[0].id, 0); // the opening screen's bed
 const ui = createUi({
   steps,
   onNext: () => controller.next(),
@@ -32,6 +44,9 @@ const ui = createUi({
   onRestart: () => controller.restart(),
   onCaptionComplete: (index) => kiosk?.captionComplete(index),
   onKioskStart: () => kiosk?.start(),
+  onSoundToggle: () => audio.setMuted(!audio.muted, { byVisitor: true }),
+  soundSupported: audio.supported,
+  soundMuted: audio.muted,
   onCaptionShown: (step) => {
     if (step.calloutWhenReady && controller.state.busy) pendingCallouts = step;
     else startCallouts(step);
@@ -64,6 +79,7 @@ const theme = createTheme((colours) => {
 const arena = arenaSize(cube.cubes.length);
 const physics = createPhysics();
 physics.setBounds(arena.width, arena.depth);
+physics.onImpact((kind, speed) => audio.impact(kind, speed));
 scene?.setArena({ ...arena, streamRadius: streamRadius(cube.cubes.length, { duration: DURATIONS.drop, ramp: DURATIONS.dropRamp }) });
 const cubeBox = cubeFrame(cube.size);
 scene?.setCubeFrame(cubeBox);
@@ -114,6 +130,7 @@ const ctx = {
   logo,
   cubeCentre: cubeBox.centreY,
   repel: false, // set from the current step
+  audio,
   setTheme: (name, seconds = DURATIONS.theme) => theme.animateTo(name, seconds),
   capture: () => field?.capture() ?? [],
   reset: async () => {
@@ -238,6 +255,7 @@ function startCallouts(step) {
       delay: n === 0 ? undefined : (delay ?? 0),
       onLabel: () => {
         for (const axis of [reveal ?? []].flat()) frame?.showAxis(axis, CALLOUT.labelFade);
+        audio.tag();
         ui.announce(text); // for screen readers: each label is read as it comes in
       },
       pick: () => {
@@ -260,6 +278,7 @@ const controller = createController({
     if (state.index !== lastIndex) {
       callouts.forEach((c) => c.hide());
       pendingCallouts = null;
+      audio.step(state.step.id, state.index > lastIndex ? 1 : -1);
       lastIndex = state.index;
     }
     if (!state.busy && pendingCallouts) {
@@ -275,7 +294,6 @@ let lastIndex = controller.state.index;
 ui.render(controller.state);
 
 // Kiosk mode: the story plays itself. Started by the link on the opening screen or by ?kiosk in the address.
-const eventMode = /[?&]kiosk(?:&|$)/.test(location.search);
 const kiosk = createKiosk({
   controller,
   steps,
@@ -283,6 +301,7 @@ const kiosk = createKiosk({
   reduced: reducedMotion,
   onChange: (mode) => {
     ui.setKioskMode(mode);
+    if (mode === 'auto') audio.setMuted(true); // kiosk mode starts muted; a visitor can press Sound
     if (mode !== 'auto' && virtualCursor) virtualCursor.hidden = true;
   },
 });

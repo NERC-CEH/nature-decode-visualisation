@@ -30,6 +30,7 @@
 //                      H.264 encoder, with the mp4-muxer package: no ffmpeg or other program needed), or
 //                      png (save numbered PNG files and print the ffmpeg command). auto picks the first
 //                      that works, in that order.
+//   --no-audio         make a silent video (by default the sound is built from what the page would have played)
 //   --bitrate 15       video bitrate in Mbit/s for the browser encoder (default: about 0.12 bits a pixel at 30 fps or more, and at least 3)
 //
 // Needs: `npm install` (playwright-core, mp4-muxer) and a Chromium-based browser. ffmpeg is optional.
@@ -39,12 +40,13 @@
 // --height, or --max-seconds.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright-core';
+import { bundleSoundtrack } from './lib/bundle-soundtrack.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values: args } = parseArgs({
@@ -61,6 +63,7 @@ const { values: args } = parseArgs({
     browser: { type: 'string' },
     encoder: { type: 'string', default: 'auto' },
     bitrate: { type: 'string' },
+    'no-audio': { type: 'boolean', default: false },
   },
   allowNegative: true,
 });
@@ -146,7 +149,7 @@ const server = createServer((req, res) => {
   res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream' }).end(readFileSync(file));
 });
 await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
-const url = `http://127.0.0.1:${server.address().port}/?debug&size=${Number(args.size)}`;
+const url = `http://127.0.0.1:${server.address().port}/?debug&audiolog&size=${Number(args.size)}`; // ?audiolog: the page logs its sound events instead of playing them
 
 // 2. The browser, on a virtual clock.
 function findBrowser() {
@@ -221,6 +224,8 @@ if (encoder === 'ffmpeg') {
   console.warn(`The frames are saved as PNG files in ${framesDir}`);
 }
 
+// the page's clock when the first frame begins, so the sound events can be placed on the video's timeline
+const audioStart = await page.evaluate(() => performance.now() / 1000);
 let frames = 0;
 const timing = { advance: 0, shot: 0 };
 const started = Date.now();
@@ -305,10 +310,42 @@ if (encoderPage) {
   const sizes = done.chunks;
   console.log(`Encoded ${sizes.length} frames; the biggest was ${Math.max(...sizes)} bytes and the median ${[...sizes].sort((a, b) => a - b)[Math.floor(sizes.length / 2)]}.`);
 }
+const audioEvents = args['no-audio'] ? null : await page.evaluate(() => globalThis.__dataCube.ctx.audio.log);
 await browser.close();
 server.close();
 if (ffmpeg || encoderPage) {
   console.log(`Wrote ${out}: ${frames} frames, ${(frames * rafMs / 1000).toFixed(1)} s of animation${videoBytes ? `, ${(videoBytes / 1e6).toFixed(1)} MB` : ''}.`);
 } else {
   console.log(`Wrote ${frames} frames to ${framesDir}. Install ffmpeg, then make the video with:\n  ffmpeg -framerate ${fps.toFixed(4)} -i "${join(framesDir, 'frame-%06d.png')}" -vf format=yuv420p -c:v libx264 -crf 14 "${out}"`);
+}
+
+// 5. The soundtrack. The page logged what it would have played; the same synthesis draws it into a WAV
+// file, which is added to the video. A second browser does this, with its own ordinary clock.
+if (audioEvents && (ffmpeg || encoderPage)) {
+  console.log(`Building the soundtrack from ${audioEvents.length} sound events...`);
+  const soundBrowser = await chromium.launch({ ...findBrowser(), args: ['--no-sandbox'] });
+  const soundPage = await soundBrowser.newPage();
+  soundPage.on('pageerror', (e) => console.error('soundtrack page error:', e.message));
+  await soundPage.goto('about:blank');
+  await soundPage.addScriptTag({ content: await bundleSoundtrack() });
+  const seconds = (frames * rafMs) / 1000;
+  const base64 = await soundPage.evaluate(async (options) => {
+    const bytes = await globalThis.soundtrack.renderSoundtrack(options.events, { start: options.start, duration: options.duration });
+    let text = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(text);
+  }, { events: audioEvents, start: audioStart, duration: seconds });
+  await soundBrowser.close();
+  const wavPath = out.replace(/\.[^.]+$/, '') + '.wav';
+  writeFileSync(wavPath, Buffer.from(base64, 'base64'));
+  console.log(`Wrote ${wavPath}.`);
+  if (haveFfmpeg) {
+    const silent = out.replace(/\.[^.]+$/, '') + '-silent.mp4';
+    renameSync(out, silent);
+    const mux = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', silent, '-i', wavPath, '-map', '0:v', '-map', '1:a',
+      '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest', out], { stdio: 'inherit' });
+    if (mux.status === 0) { unlinkSync(silent); console.log(`Added the sound to ${out}.`); } else { renameSync(silent, out); console.warn('ffmpeg could not add the sound; the video is silent. The soundtrack is the WAV file.'); }
+  } else {
+    console.log(`ffmpeg was not found. To add the sound, run:\n  ffmpeg -i "${out}" -i "${wavPath}" -map 0:v -map 1:a -c:v copy -c:a aac -shortest "${out.replace(/\.mp4$/, '-with-sound.mp4')}"`);
+  }
 }

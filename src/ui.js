@@ -12,7 +12,7 @@ const FADE_IN_MS = 1400;
 
 const noCallouts = () => {};
 
-export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = noCallouts, onCaptionComplete = noCallouts, onKioskStart = noCallouts }) {
+export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = noCallouts, onCaptionComplete = noCallouts, onKioskStart = noCallouts, onSoundToggle = noCallouts, soundSupported = false, soundMuted = false }) {
   const $ = (id) => document.getElementById(id);
   const el = {
     app: $('app'),
@@ -30,6 +30,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
     credit: $('credit'),
     announcer: $('announcer'),
     kioskStart: $('kiosk-start'),
+    sound: $('sound'),
     kioskStatus: $('kiosk-status'),
     fallback: $('fallback'),
     body: document.querySelector('.caption-body'),
@@ -143,6 +144,14 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
   const goNext = press(() => current.canNext || current.canRestart, () => (current.canRestart ? onRestart() : onNext()));
   const goBack = press(() => current.canBack, onBack);
   el.kioskStart.addEventListener('click', () => onKioskStart());
+  // The sound button says what pressing it does not; it shows the state: Sound on or Sound off.
+  const showSound = (muted) => {
+    el.sound.textContent = muted ? 'Sound off' : 'Sound on';
+    el.sound.setAttribute('aria-pressed', String(!muted));
+  };
+  el.sound.hidden = !soundSupported;
+  showSound(soundMuted);
+  el.sound.addEventListener('click', () => onSoundToggle());
   el.next.addEventListener('click', goNext);
   el.back.addEventListener('click', goBack);
 
@@ -158,6 +167,7 @@ export function createUi({ steps, onNext, onBack, onRestart, onCaptionShown = no
   return {
     revealText,
     announce,
+    setSoundState: showSound,
     // Show or hide the kiosk status line and the "Play automatically" link for the kiosk's mode.
     setKioskMode(mode) {
       el.kioskStatus.hidden = mode !== 'auto';
