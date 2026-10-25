@@ -22,14 +22,17 @@ export function createPlayer(ctx, { level: overall = SOUND.master } = {}) {
   const duckGain = ctx.createGain();
   duckGain.connect(master);
 
-  let voices = 0;
+  // when each sound that is playing or booked will end, on the context's clock; counting these (not
+  // waiting for 'ended' events) also works when the whole soundtrack is booked ahead on an offline context
+  let ends = [];
   let bed = null; // { gain, source }
 
   return {
     // A sound effect. Returns false if too many are already playing.
-    effect(buffer, at, { gain = 1, rate = 1 } = {}) {
-      if (voices >= SOUND.voices) return false;
-      voices += 1;
+    effect(buffer, at, { gain = 1, rate = 1, length = 0 } = {}) {
+      ends = ends.filter((end) => end > at);
+      if (ends.length >= SOUND.voices) return false;
+      ends.push(at + (length > 0 ? Math.min(length, buffer.duration) : buffer.duration) / rate);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.playbackRate.value = rate;
@@ -37,8 +40,9 @@ export function createPlayer(ctx, { level: overall = SOUND.master } = {}) {
       level.gain.value = gain;
       source.connect(level);
       level.connect(master);
-      source.onended = () => { voices -= 1; source.disconnect(); level.disconnect(); };
+      source.onended = () => { source.disconnect(); level.disconnect(); };
       source.start(at);
+      if (length > 0) source.stop(at + length / rate);
       return true;
     },
 
@@ -90,7 +94,9 @@ export function createPlayer(ctx, { level: overall = SOUND.master } = {}) {
 export function perform(player, buffers, event, at, state = {}) {
   switch (event.type) {
     case 'impact':
-      player.effect(buffers[event.kind === 'ground' ? 'thud' : 'clack'], at, { gain: event.gain, rate: event.rate });
+      player.effect(buffers[event.kind === 'ground' ? 'thud' : 'clack'], at, {
+        gain: event.gain, rate: event.rate, length: event.kind === 'ground' ? SOUND.thudLength : SOUND.clackLength,
+      });
       if (event.strength >= SOUND.duckAbove && at - (state.lastDuck ?? -1) > 0.3) {
         state.lastDuck = at;
         player.duck(at);

@@ -413,10 +413,15 @@ export const BED = {
 
 export const SOUND = {
   master: 0.35, // overall level, 0 to 1
-  voices: 14, // most sound effects playing at once
-  impactMinSpeed: 1.2, // slower contacts make no sound (cube units a second)
-  impactFullSpeed: 9, // contacts at or above this speed are played at full strength
-  impactGap: 0.012, // fewest seconds between two impacts that make a sound
+  voices: 32, // most sound effects playing at once
+  impactMinSpeed: 2.5, // slower contacts make no sound (cube units a second): a settling pile jitters at 1 to 2
+  impactFullSpeed: 35, // contacts at or above this speed are played at full strength (cubes poured from the top land at 40 to 60)
+  impactsPerStep: 2, // most impacts that sound in one physics step (a step is 1/60 s); a pour of cubes is a patter, not a wall
+  impactSpread: 0.016, // seconds: each impact is placed at a random moment within its step, so they do not land together
+  densityTau: 0.2, // seconds over which a busy stretch of impacts is remembered...
+  densityRef: 6, // ...an impact is played at 1 / sqrt(1 + recent impacts / this) of its strength, so a pour does not pile up into a wall
+  clackLength: 0.2, // seconds of each sound that are played: the rest of the drawn buffer is silence
+  thudLength: 0.4,
   duckDb: -2, // the bed dips this far under a hard impact...
   duckAbove: 0.6, // ...when its strength (0 to 1) is at least this
 };

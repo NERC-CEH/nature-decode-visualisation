@@ -79,7 +79,7 @@ const theme = createTheme((colours) => {
 const arena = arenaSize(cube.cubes.length);
 const physics = createPhysics();
 physics.setBounds(arena.width, arena.depth);
-physics.onImpact((kind, speed) => audio.impact(kind, speed));
+physics.onImpact((kind, speed, offset) => audio.impact(kind, speed, offset));
 scene?.setArena({ ...arena, streamRadius: streamRadius(cube.cubes.length, { duration: DURATIONS.drop, ramp: DURATIONS.dropRamp }) });
 const cubeBox = cubeFrame(cube.size);
 scene?.setCubeFrame(cubeBox);

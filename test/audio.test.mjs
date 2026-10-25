@@ -22,23 +22,26 @@ test('in log mode each call is written to the list, with its time', () => {
   assert.ok(audio.log.every((e) => typeof e.t === 'number'));
 });
 
-test('slow contacts make no sound, and the strength follows the speed', async () => {
+test('slow contacts make no sound, and the strength follows the speed', () => {
   const audio = logging();
   audio.impact('cube', SOUND.impactMinSpeed / 2);
   assert.equal(audio.log.length, 0);
-  audio.impact('ground', SOUND.impactFullSpeed * 2);
-  await new Promise((resolve) => setTimeout(resolve, SOUND.impactGap * 1000 + 5));
-  audio.impact('cube', SOUND.impactFullSpeed / 3);
+  audio.impact('ground', SOUND.impactFullSpeed * 2, 0);
+  audio.impact('cube', SOUND.impactFullSpeed / 3, 0);
   const [hard, soft] = audio.log;
   assert.equal(hard.kind, 'ground');
   assert.equal(hard.strength, 1);
   assert.ok(soft.strength < 0.5 && soft.gain < hard.gain);
 });
 
-test('impacts closer together than the gap are dropped', () => {
+test('only the first few impacts of a physics step sound, and they are spread over the step', () => {
   const audio = logging();
-  for (let i = 0; i < 20; i++) audio.impact('cube', 5);
-  assert.ok(audio.log.length < 20 && audio.log.length >= 1);
+  for (let i = 0; i < 20; i++) audio.impact('cube', 5, 0);
+  assert.equal(audio.log.length, SOUND.impactsPerStep);
+  const times = audio.log.map((e) => e.t);
+  assert.ok(Math.max(...times) - Math.min(...times) <= SOUND.impactSpread + 0.002);
+  audio.impact('cube', 5, 1 / 60); // the next step in the same frame has its own allowance
+  assert.equal(audio.log.length, SOUND.impactsPerStep + 1);
 });
 
 test('the visitor\'s choice about sound is not undone by kiosk mode', () => {
@@ -62,4 +65,33 @@ test('the physics reports ground and cube contacts with their speed', () => {
   assert.ok(heard.some((h) => h.kind === 'ground' && h.speed > SOUND.impactMinSpeed), 'a cube hit the floor');
   assert.ok(heard.some((h) => h.kind === 'cube'), 'two cubes touched');
   assert.equal(heard.filter((h) => h.kind === 'cube').length, new Set(heard.filter((h) => h.kind === 'cube').map((h) => h.speed)).size, 'each cube contact is reported once');
+});
+
+// ---- the player, on a stand-in for an audio context ------------------------------------
+function fakeContext() {
+  const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
+  const node = () => ({ connect() {}, disconnect() {}, gain: param(), threshold: param(), knee: param(), ratio: param(), attack: param(), release: param() });
+  const started = [];
+  return {
+    started,
+    destination: {},
+    createGain: node,
+    createDynamicsCompressor: node,
+    createBufferSource: () => ({ ...node(), playbackRate: param(), start(at) { started.push(at); }, stop() {} }),
+  };
+}
+const { createPlayer } = await import('../src/audio/player.js');
+
+test('the voice limit counts sounds by when they end, so a whole soundtrack booked ahead is not cut off', () => {
+  const ctx = fakeContext();
+  const player = createPlayer(ctx);
+  const buffer = { duration: 0.4 };
+  // far more sounds than the limit, each well after the last one has ended: all must play
+  for (let i = 0; i < SOUND.voices * 3; i++) assert.equal(player.effect(buffer, i * 10), true);
+  assert.equal(ctx.started.length, SOUND.voices * 3);
+  // but too many at the same moment are refused
+  const again = fakeContext();
+  const busy = createPlayer(again);
+  const results = Array.from({ length: SOUND.voices + 5 }, () => busy.effect(buffer, 1));
+  assert.equal(results.filter(Boolean).length, SOUND.voices);
 });

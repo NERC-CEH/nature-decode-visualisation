@@ -25,7 +25,9 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
   let playing = null; // the step whose bed is playing
   let userChoice = false; // the visitor has pressed the sound button
   let isMuted = muted;
-  let lastImpact = -1;
+  let bucket = { offset: -1, t: -1, n: 0 };
+  let density = 0; // impacts recently sounded, fading over SOUND.densityTau
+  let densityAt = 0;
   const state = {};
   const effects = {};
   const beds = {};
@@ -33,7 +35,8 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
 
   const supported = log || (Boolean(synth) && typeof window !== 'undefined' && Boolean(window.AudioContext || window.webkitAudioContext));
 
-  function record(event) { events.push({ t: seconds(), ...event }); }
+  // `delay` is how long after now the sound happens (see impact())
+  function record(event, delay = 0) { events.push({ t: seconds() + delay, ...event }); }
 
   // ---- drawing the buffers, one at a time, in the background
   function drawBed(id) {
@@ -64,7 +67,7 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
   function unlock() {
     if (log || ctx || !supported) return;
     const Context = window.AudioContext || window.webkitAudioContext;
-    ctx = new Context({ latencyHint: 'playback' });
+    ctx = new Context({ latencyHint: 'interactive' }); // playing buffers is cheap, so ask for the least delay: impacts must land with the picture
     player = createPlayer(ctx);
     if (isMuted) player.setMuted(true, ctx.currentTime);
     ctx.resume?.();
@@ -91,18 +94,24 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
       if (live() && direction !== 0) perform(player, effects, { type: 'slide', direction }, now(), state);
     },
 
-    // Two cubes, or a cube and the ground, touching at `speed` (cube edges a second).
-    impact(kind, speed) {
+    // Two cubes, or a cube and the ground, touching at `speed` (cube edges a second), `offset` seconds
+    // into the physics update. A pour of cubes makes many at once: only the first few of each physics
+    // step sound, each at a random moment in the step, so it patters.
+    impact(kind, speed, offset = 0) {
       if (speed < SOUND.impactMinSpeed) return;
       const t = seconds();
-      if (t - lastImpact < SOUND.impactGap) return;
-      lastImpact = t;
-      const strength = Math.min(1, speed / SOUND.impactFullSpeed);
-      const gain = 0.15 + 0.8 * strength;
+      if (offset !== bucket.offset || t - bucket.t > 0.004) bucket = { offset, t, n: 0 };
+      if (++bucket.n > SOUND.impactsPerStep) return;
+      const delay = offset + Math.random() * SOUND.impactSpread;
+      const strength = Math.min(1, ((speed - SOUND.impactMinSpeed) / (SOUND.impactFullSpeed - SOUND.impactMinSpeed)) ** 0.7);
+      density *= Math.exp(-(t - densityAt) / SOUND.densityTau);
+      densityAt = t;
+      const gain = (0.15 + 0.7 * strength) / Math.sqrt(1 + density / SOUND.densityRef);
+      density += 1;
       const rate = jitter();
       const event = { type: 'impact', kind, gain, rate, strength };
-      if (log) { record(event); return; }
-      if (live()) perform(player, effects, event, now(), state);
+      if (log) { record(event, delay); return; }
+      if (live()) perform(player, effects, event, now() + delay, state);
     },
 
     // A tag or label has appeared.

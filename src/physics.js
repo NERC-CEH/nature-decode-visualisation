@@ -23,6 +23,7 @@ export function createPhysics(settings = PHYSICS) {
   const walls = [];
   const hooks = [];
   const impactListeners = [];
+  let intoStep = 0; // seconds into the current step() call that the fixed step being run starts
   let accumulator = 0;
 
   return {
@@ -65,7 +66,7 @@ export function createPhysics(settings = PHYSICS) {
         const ground = other.type === CANNON.Body.STATIC;
         if (!ground && other.id < body.id) return;
         const speed = Math.abs(event.contact.getImpactVelocityAlongNormal());
-        for (const fn of impactListeners) fn(ground ? 'ground' : 'cube', speed);
+        for (const fn of impactListeners) fn(ground ? 'ground' : 'cube', speed, intoStep);
       });
       body.position.set(position.x, position.y, position.z);
       if (quaternion) body.quaternion.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
@@ -80,7 +81,9 @@ export function createPhysics(settings = PHYSICS) {
       if (i >= 0) bodies.splice(i, 1);
     },
 
-    // Call `fn(kind, speed)` whenever cubes touch ('cube' or 'ground'), speed in cube edges a second.
+    // Call `fn(kind, speed, offset)` whenever cubes touch ('cube' or 'ground'): speed in cube edges a second,
+    // offset the seconds into the current step() call that the contact happened (a slow frame is several
+    // fixed steps, and the contacts in it did not all happen at once).
     onImpact(fn) {
       impactListeners.push(fn);
     },
@@ -94,10 +97,12 @@ export function createPhysics(settings = PHYSICS) {
     // Advance by real elapsed seconds, in fixed steps.
     step(dt) {
       accumulator = Math.min(accumulator + dt, 0.1);
+      intoStep = 0;
       while (accumulator >= settings.step) {
         for (const hook of hooks) hook(settings.step);
         world.step(settings.step);
         accumulator -= settings.step;
+        intoStep += settings.step;
       }
     },
 

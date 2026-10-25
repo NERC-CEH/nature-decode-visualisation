@@ -323,6 +323,7 @@ if (ffmpeg || encoderPage) {
 // file, which is added to the video. A second browser does this, with its own ordinary clock.
 if (audioEvents && (ffmpeg || encoderPage)) {
   console.log(`Building the soundtrack from ${audioEvents.length} sound events...`);
+  writeFileSync(out.replace(/\.[^.]+$/, '') + '-sound-events.json', JSON.stringify({ start: audioStart, events: audioEvents }));
   const soundBrowser = await chromium.launch({ ...findBrowser(), args: ['--no-sandbox'] });
   const soundPage = await soundBrowser.newPage();
   soundPage.on('pageerror', (e) => console.error('soundtrack page error:', e.message));
