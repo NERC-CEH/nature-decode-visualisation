@@ -414,12 +414,17 @@ export const BED = {
 export const SOUND = {
   master: 0.35, // overall level, 0 to 1
   voices: 32, // most sound effects playing at once
-  impactMinSpeed: 2.5, // slower contacts make no sound (cube units a second): a settling pile jitters at 1 to 2
-  impactFullSpeed: 35, // contacts at or above this speed are played at full strength (cubes poured from the top land at 40 to 60)
+  impactMinSpeed: 3, // slower contacts make no sound (cube units a second). This is the speed the cubes have really been travelling at (see physics.js), so a settling pile or a heap held together by the Sort pull is below it
+  impactFullSpeed: 20, // contacts at or above this speed are played at full strength: cubes thrown or poured in reach this and more
+  impactCurve: 1.6, // loudness follows speed: strength = (how far between min and full speed) ^ this. Above 1, a gentle knock is much quieter than a hard one
+  impactQuiet: 0.04, // the gain of the gentlest knock that sounds...
+  impactLoud: 0.9, // ...and of a knock at full speed
   impactsPerStep: 2, // most impacts that sound in one physics step (a step is 1/60 s); a pour of cubes is a patter, not a wall
   impactSpread: 0.016, // seconds: each impact is placed at a random moment within its step, so they do not land together
-  densityTau: 0.2, // seconds over which a busy stretch of impacts is remembered...
-  densityRef: 6, // ...an impact is played at 1 / sqrt(1 + recent impacts / this) of its strength, so a pour does not pile up into a wall
+  burst: 6, // a sustained rush of contacts (the Sort step) may sound at most `rate` impacts a second, after a burst of this many:
+  rate: 20, // a pour is a patter, but cubes sliding into heaps for seconds must not become a roar
+  densityTau: 0.3, // seconds over which a busy stretch of impacts is remembered...
+  densityRef: 3, // ...an impact is played at 1 / sqrt(1 + recent impacts / this) of its strength, so a pour does not pile up into a wall
   clackLength: 0.2, // seconds of each sound that are played: the rest of the drawn buffer is silence
   thudLength: 0.4,
   duckDb: -2, // the bed dips this far under a hard impact...

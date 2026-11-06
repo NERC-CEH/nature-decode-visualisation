@@ -28,6 +28,8 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
   let bucket = { offset: -1, t: -1, n: 0 };
   let density = 0; // impacts recently sounded, fading over SOUND.densityTau
   let densityAt = 0;
+  let tokens = SOUND.burst; // impacts allowed now: refilled at SOUND.rate a second, so a long rush stays a patter
+  let tokensAt = 0;
   const state = {};
   const effects = {};
   const beds = {};
@@ -102,11 +104,15 @@ export function createAudio({ synth = null, log = false, stepIds = Object.keys(B
       const t = seconds();
       if (offset !== bucket.offset || t - bucket.t > 0.004) bucket = { offset, t, n: 0 };
       if (++bucket.n > SOUND.impactsPerStep) return;
+      tokens = Math.min(SOUND.burst, tokens + (t - tokensAt) * SOUND.rate);
+      tokensAt = t;
+      if (tokens < 1) return;
+      tokens -= 1;
       const delay = offset + Math.random() * SOUND.impactSpread;
-      const strength = Math.min(1, ((speed - SOUND.impactMinSpeed) / (SOUND.impactFullSpeed - SOUND.impactMinSpeed)) ** 0.7);
+      const strength = Math.min(1, ((speed - SOUND.impactMinSpeed) / (SOUND.impactFullSpeed - SOUND.impactMinSpeed)) ** SOUND.impactCurve);
       density *= Math.exp(-(t - densityAt) / SOUND.densityTau);
       densityAt = t;
-      const gain = (0.15 + 0.7 * strength) / Math.sqrt(1 + density / SOUND.densityRef);
+      const gain = (SOUND.impactQuiet + (SOUND.impactLoud - SOUND.impactQuiet) * strength) / Math.sqrt(1 + density / SOUND.densityRef);
       density += 1;
       const rate = jitter();
       const event = { type: 'impact', kind, gain, rate, strength };

@@ -36,11 +36,11 @@ test('slow contacts make no sound, and the strength follows the speed', () => {
 
 test('only the first few impacts of a physics step sound, and they are spread over the step', () => {
   const audio = logging();
-  for (let i = 0; i < 20; i++) audio.impact('cube', 5, 0);
+  for (let i = 0; i < 20; i++) audio.impact('cube', SOUND.impactMinSpeed + 3, 0);
   assert.equal(audio.log.length, SOUND.impactsPerStep);
   const times = audio.log.map((e) => e.t);
   assert.ok(Math.max(...times) - Math.min(...times) <= SOUND.impactSpread + 0.002);
-  audio.impact('cube', 5, 1 / 60); // the next step in the same frame has its own allowance
+  audio.impact('cube', SOUND.impactMinSpeed + 3, 1 / 60); // the next step in the same frame has its own allowance
   assert.equal(audio.log.length, SOUND.impactsPerStep + 1);
 });
 

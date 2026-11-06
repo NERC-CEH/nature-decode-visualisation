@@ -1,5 +1,7 @@
 # Our planet. Decoded. Data cube animation
 
+**Live site: <https://nerc-ceh.github.io/nature-decode-visualisation/>**
+
 An interactive 3D animation that shows how scattered records of wildlife become a data cube
 (species × location × time) that reveals patterns in nature. It rebuilds the
 [physical data cube](https://digitalenvironment.org/building-a-physical-data-cube/) as a web page.
@@ -8,7 +10,7 @@ An interactive 3D animation that shows how scattered records of wildlife become 
 
 *Click the image to watch the video (97 seconds).*
 
-Prefer to try it yourself? Open the [live version](https://tomaugust.github.io/nature-decode-visualisation/).
+Prefer to try it yourself? Open the [live version](https://nerc-ceh.github.io/nature-decode-visualisation/).
 
 Status: every step of the animation works, from the opening screen to the logo and Restart, with tag
 lines and labels that point at the data. Kiosk mode, keyboard and screen-reader support and a data size selector are done. Still to do: a final
